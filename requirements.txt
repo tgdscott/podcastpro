@@ -1,2 +1,12 @@
+Flask==3.0.0
+gunicorn==21.2.0
 psycopg2-binary==2.9.9
 pg8000==1.30.3
+google-cloud-sql-connector[pg8000]==1.11.0
+google-cloud-storage==2.13.0
+python-dotenv==1.0.0
+Werkzeug==3.0.1
+Jinja2==3.1.2
+itsdangerous==2.1.2
+click==8.1.7
+MarkupSafe==2.1.3
