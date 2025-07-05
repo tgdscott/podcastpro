@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Your Podcasts</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); max-width: 900px; margin: auto; }
+        h1 { color: #333; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        a { color: #007bff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .button { display: inline-block; background-color: #007bff; color: white; padding: 10px 15px; border-radius: 4px; text-decoration: none; margin-bottom: 20px; }
+        .button:hover { background-color: #0056b3; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #e9ecef; }
+        .flash-messages { list-style: none; padding: 0; }
+        .flash-messages li { padding: 10px; margin-bottom: 10px; border-radius: 4px; }
+        .flash-messages .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .flash-messages .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Your Podcasts</h1>
+        <p><a href="{{ url_for('index') }}">Back to Home</a> | <a href="{{ url_for('settings.settings_page') }}">Global Settings</a></p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <ul class="flash-messages">
+            {% for category, message in messages %}
+              <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+
+        <a href="{{ url_for('podcasts.new_podcast') }}" class="button">Create New Podcast Project</a>
+
+        {% if podcasts %}
+            <table>
+                <thead>
+                    <tr><th>Title</th><th>Author</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                    {% for podcast in podcasts %}
+                    <tr><td>{{ podcast.title }}</td><td>{{ podcast.author if podcast.author else 'N/A' }}</td><td><a href="{{ url_for('podcasts.edit_podcast', podcast_id=podcast.id) }}">Edit</a></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No podcast projects found. Create one to get started!</p>
+        {% endif %}
+    </div>
+</body>
+</html>

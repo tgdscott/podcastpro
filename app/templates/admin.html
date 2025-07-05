@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin - Job Queue & Scheduled Episodes</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1, h2 { color: #333; }
+        a { color: #007bff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; margin-bottom: 30px; } /* Added margin-bottom */
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 0.9em; } /* Slightly smaller font for tables */
+        th { background-color: #e9ecef; }
+        /* Zebra striping for better readability */
+        tbody tr:nth-child(odd) {
+            background-color: #f9f9f9;
+        }
+        tbody tr:hover {
+            background-color: #f1f1f1;
+        }
+        .flash-messages { list-style: none; padding: 0; }
+        .flash-messages li { padding: 10px; margin-bottom: 10px; border-radius: 4px; }
+        .flash-messages .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .flash-messages .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .action-button {
+            color: white; padding: 5px 10px;
+            margin: 2px;
+            border: none; border-radius: 4px; cursor: pointer;
+            font-size: 0.9em;
+        }
+        .delete-button { background-color: #dc3545; }
+        .delete-button:hover { background-color: #c82333; }
+        .unschedule-button { background-color: #ffc107; color: #212529; } /* Yellowish for unschedule */
+        .unschedule-button:hover { background-color: #e0a800; }
+        .view-logs-button { background-color: #17a2b8; }
+        .view-logs-button:hover { background-color: #138496; }
+        .rerun-button { background-color: #28a745; }
+        .rerun-button:hover { background-color: #218838; }
+        .preview-breaks-button { background-color: #6c757d; color: white; padding: 8px 15px; margin-bottom: 20px; border-radius: 5px; cursor: pointer; border: none; font-size: 1em; }
+        .preview-breaks-button:hover { background-color: #5a6268; }
+
+
+        /* Column width adjustments */
+        th.col-id, td.col-id { width: 5%; }
+        th.col-status, td.col-status { width: 10%; }
+        th.col-topic, td.col-topic { width: 25%; }
+        th.col-actions, td.col-actions { width: 20%; text-align: center; }
+
+        /* Log Modal Styles */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 1200px; border-radius: 8px; box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2); }
+        .modal-header { padding-bottom: 10px; border-bottom: 1px solid #ddd; }
+        .modal-header h2 { margin: 0; }
+        .close-button { color: #aaa; float: right; font-size: 28px; font-weight: bold; }
+        .close-button:hover, .close-button:focus { color: black; text-decoration: none; cursor: pointer; }
+        .log-container {
+            margin-top: 15px;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9em;
+            padding: 15px;
+            height: 60vh;
+            overflow-y: auto;
+            border-radius: 4px;
+            white-space: pre-wrap; /* Wrap long lines */
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Admin Area</h1>
+        <p><a href="{{ url_for('index') }}">Home</a> | <a href="{{ url_for('settings.settings_page') }}">Settings</a> | <a href="{{ url_for('podcasts.list_podcasts') }}">Manage Podcasts</a> | <a href="{{ url_for('templates.list_templates') }}">Manage Templates</a></p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <ul class="flash-messages">
+            {% for category, message in messages %}
+              <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+
+        <button id="preview-breaks-btn" class="preview-breaks-button">Preview Breaks</button>
+
+        <h2>Active Job Queue (Pending/Processing)</h2>
+        {% if jobs %}
+            <table>
+                <thead>
+                    <tr>
+                        <th class="col-id">ID</th>
+                        <th class="col-status">Status</th>
+                        <th>Template Path</th>
+                        <th>Recording File</th>
+                        <th>Ep #</th>
+                        <th class="col-topic">Episode Topic</th>
+                        <th>AI Intro Text</th>
+                        <th>Created At (Local)</th>
+                        <th class="col-actions">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for job in jobs %}
+                    <tr>
+                        <td class="col-id job-id">{{ job.id }}</td>
+                        <td class="col-status job-status" data-job-id="{{ job.id }}">{{ job.status }}</td>
+                        <td>{{ job.template_path.split('/')[-1] if job.template_path else 'N/A' }}</td>
+                        <td>{{ job.recording_filename }}</td>
+                        <td>{{ job.episode_number if job.episode_number else 'N/A' }}</td>
+                        <td class="col-topic">{{ job.episode_topic if job.episode_topic else 'N/A' }}</td>
+                        <td>{{ job.ai_intro_text[:30] if job.ai_intro_text else 'N/A' }}{{ '...' if job.ai_intro_text and job.ai_intro_text|length > 30 }}</td>
+                        <td>{{ job.created_at | local_time }}</td>
+                        <td class="col-actions">
+                            <button class="action-button view-logs-button" data-job-id="{{ job.id }}">View Logs</button> {# This will call admin.get_job_logs_api #}
+                            <form method="post" action="{{ url_for('admin.delete_job', job_id=job.id) }}" onsubmit="return confirm('Are you sure you want to delete job ID {{ job.id }}?');" style="display:inline;">
+                                <button type="submit" class="action-button delete-button">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No active jobs in the queue.</p>
+        {% endif %}
+
+        <h2>Job History (Completed/Failed)</h2>
+        {% if job_history %}
+            <table>
+                <thead>
+                    <tr>
+                        <th class="col-id">ID</th>
+                        <th class="col-status">Status</th>
+                        <th>Template Path</th>
+                        <th>Recording File</th>
+                        <th>Ep #</th>
+                        <th class="col-topic">Episode Topic</th>
+                        <th>Updated At (Local)</th>
+                        <th class="col-actions">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for job in job_history %}
+                    <tr>
+                        <td class="col-id">{{ job.id }}</td>
+                        <td class="col-status">{{ job.status }}</td>
+                        <td>{{ job.template_path.split('/')[-1] if job.template_path else 'N/A' }}</td>
+                        <td>{{ job.recording_filename }}</td>
+                        <td>{{ job.episode_number if job.episode_number else 'N/A' }}</td>
+                        <td class="col-topic">{{ job.episode_topic if job.episode_topic else 'N/A' }}</td>
+                        <td>{{ job.updated_at | local_time }}</td>
+                        <td class="col-actions"> {# This will call admin.get_job_logs_api #}
+                            <button class="action-button view-logs-button" data-job-id="{{ job.id }}">View Logs</button>
+                            <form method="post" action="{{ url_for('admin.rerun_job', job_id=job.id) }}" style="display:inline;">
+                                <button type="submit" class="action-button rerun-button">Re-run</button>
+                            </form>
+                            <form method="post" action="{{ url_for('admin.delete_job', job_id=job.id) }}" onsubmit="return confirm('Are you sure you want to delete job ID {{ job.id }}?');" style="display:inline;">
+                                <button type="submit" class="action-button delete-button">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No completed or failed jobs found in the history.</p>
+        {% endif %}
+
+        <h2>Scheduled Episodes (from Local DB)</h2>
+        {% if scheduled_episodes %}
+        <table border="1" style="width:100%; border-collapse: collapse;">
+            <thead>
+                <tr>
+                    <th>DB ID</th>
+                    <th>Ep #</th>
+                    <th>Episode Topic</th>
+                    <th>Spreaker ID</th>
+                    <th>Publish At (Local)</th>
+                    <th>MP3</th>
+                    <th>Poster</th>
+                    <th>Show Notes</th>
+                    <th>Transcript</th>
+                    <th>Tags</th>
+                    <th>DB Created (Local)</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for episode in scheduled_episodes %}
+                <tr>
+                    <td>{{ episode.id }}</td>
+                    <td>{{ episode.episode_number }}</td>
+                    <td>{{ episode.episode_topic }}</td>
+                    <td>
+                        {% if episode.spreaker_episode_id %}
+                        <a href="https://www.spreaker.com/episode/{{ episode.spreaker_episode_id }}" target="_blank">{{ episode.spreaker_episode_id }}</a>
+                        {% else %}
+                        N/A
+                        {% endif %}
+                    </td>
+                    <td>{{ episode.publish_at_utc_iso | local_time if episode.publish_at_utc_iso else 'N/A' }}</td>
+                    <td>
+                        {% if episode.processed_mp3_path and episode.processed_mp3_path.split('/')[-1] %} {# This will call admin.serve_processed_file #}
+                        <a href="{{ url_for('admin.serve_processed_file', filename=episode.processed_mp3_path.split('/')[-1]) }}" download>Download</a>
+                        {% else %} N/A {% endif %}
+                    </td>
+                    <td>
+                        {% if episode.poster_path and episode.poster_path.split('/')[-1] %} {# This will call admin.serve_processed_file #}
+                        <a href="{{ url_for('admin.serve_processed_file', filename=episode.poster_path.split('/')[-1]) }}" download>Download</a>
+                        {% else %} N/A {% endif %}
+                    </td>
+                    <td>
+                        {% if episode.show_notes_path and episode.show_notes_path.split('/')[-1] %} {# This will call admin.serve_processed_file #}
+                        <a href="{{ url_for('admin.serve_processed_file', filename=episode.show_notes_path.split('/')[-1]) }}" download>Download</a>
+                        {% else %} N/A {% endif %}
+                    </td>
+                    <td>
+                        {% if episode.transcript_url and episode.transcript_url.split('/')[-1] %}
+                        <a href="{{ episode.transcript_url }}" target="_blank">View</a> {# This is an external URL, no change needed #}
+                        {% else %} N/A {% endif %}
+                    </td>
+                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ episode.tags if episode.tags else 'N/A' }}</td>
+                    <td>{{ episode.created_at | local_time if episode.created_at else 'N/A' }}</td>
+                    <td class="col-actions">
+                        <form method="POST" action="{{ url_for('admin.unschedule_episode', episode_id=episode.id) }}" onsubmit="return confirm('Are you sure you want to remove scheduled episode ID {{ episode.id }}? This will NOT delete it from Spreaker.');" style="display:inline;">
+                            <button type="submit" class="action-button unschedule-button">Unschedule</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>No episodes currently scheduled in the database.</p>
+        {% endif %}
+
+    </div>
+
+    <!-- Log Modal -->
+    <div id="logModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="close-button">&times;</span>
+                <h2 id="logModalTitle">Logs for Job #...</h2>
+            </div>
+            <div id="log-container" class="log-container">
+                <p>Loading logs...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // --- Job Status Polling ---
+            const jobStatusCells = document.querySelectorAll('.job-status');
+            const jobsToPoll = [];
+
+            jobStatusCells.forEach(cell => {
+                // We only need to poll for jobs that are 'processing' or 'pending'.
+                if (cell.textContent.trim().toLowerCase() === 'processing' || cell.textContent.trim().toLowerCase() === 'pending') {
+                    jobsToPoll.push(cell);
+                }
+            });
+
+            if (jobsToPoll.length > 0) {
+                const pollInterval = setInterval(async () => {
+                    if (jobsToPoll.length === 0) {
+                        clearInterval(pollInterval);
+                        return;
+                    }
+
+                    for (let i = jobsToPoll.length - 1; i >= 0; i--) {
+                        const cell = jobsToPoll[i];
+                        const jobId = cell.dataset.jobId;
+                        try {
+                            const response = await fetch(`{{ url_for('admin.job_status', job_id=0) }}`.replace('0', jobId));
+                            const data = await response.json();
+
+                            cell.textContent = data.status;
+
+                            // If the job is completed or failed, stop polling for it.
+                            if (data.status.toLowerCase() !== 'processing' && data.status.toLowerCase() !== 'pending') {
+                                jobsToPoll.splice(i, 1); // Remove from polling list
+                            }
+                        } catch (error) {
+                            console.error(`Error fetching status for job ${jobId}:`, error);
+                            jobsToPoll.splice(i, 1); // Stop polling on error to prevent spamming
+                        }
+                    }
+                }, 5000); // Poll every 5 seconds
+            }
+
+            // --- Log Modal Logic ---
+            const modal = document.getElementById('logModal');
+            const closeModalButton = document.querySelector('.close-button');
+            const logContainer = document.getElementById('log-container');
+            const logModalTitle = document.getElementById('logModalTitle');
+            let logPollInterval = null; // To hold the interval ID for log polling
+
+            document.querySelectorAll('.view-logs-button').forEach(button => {
+                button.addEventListener('click', function() {
+                    const jobId = this.dataset.jobId;
+                    const jobStatus = this.closest('tr').querySelector('.job-status').textContent.trim().toLowerCase();
+                    
+                    logModalTitle.textContent = `Logs for Job #${jobId}`;
+                    logContainer.innerHTML = '<p>Loading logs...</p>';
+                    modal.style.display = 'block';
+
+                    fetchAndDisplayLogs(jobId, jobStatus);
+                });
+            });
+
+            closeModalButton.onclick = function() {
+                closeLogModal();
+            }
+
+            window.onclick = function(event) {
+                if (event.target == modal) {
+                    closeLogModal();
+                }
+            }
+
+            function closeLogModal() {
+                modal.style.display = "none";
+                if (logPollInterval) {
+                    clearInterval(logPollInterval);
+                    logPollInterval = null;
+                }
+            }
+
+            async function fetchAndDisplayLogs(jobId, jobStatus) {
+                try {
+                    const response = await fetch(`{{ url_for('admin.get_job_logs_api', job_id=0) }}`.replace('0', jobId));
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const logs = await response.json();
+                    
+                    if (logs.length === 0) {
+                        logContainer.textContent = 'No logs found for this job yet.';
+                    } else {
+                        // Format logs for display
+                        const formattedLogs = logs.map(log => {
+                            // The timestamp from SQLite is UTC. Convert it to a readable local time string.
+                            const localTimestamp = new Date(log.timestamp + 'Z').toLocaleString();
+                            return `[${localTimestamp}] ${log.message}`;
+                        }).join('\n');
+                        logContainer.textContent = formattedLogs;
+                    }
+                    // Scroll to the bottom of the log container
+                    logContainer.scrollTop = logContainer.scrollHeight;
+
+                    // If the job is still processing, set up polling if not already active
+                    if ((jobStatus === 'processing' || jobStatus === 'pending') && !logPollInterval) {
+                        logPollInterval = setInterval(() => fetchAndDisplayLogs(jobId, jobStatus), 3000); // Poll every 3 seconds
+                    }
+
+                } catch (error) {
+                    logContainer.textContent = `Error loading logs: ${error.message}`;
+                    console.error('Error fetching logs:', error);
+                }
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin Dashboard</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); max-width: 1200px; margin: auto; }
+        h1, h2 { color: #333; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        a { color: #007bff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; vertical-align: middle; }
+        th { background-color: #e9ecef; }
+        .flash-messages { list-style: none; padding: 0; }
+        .flash-messages li { padding: 10px; margin-bottom: 10px; border-radius: 4px; }
+        .flash-messages .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .flash-messages .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .action-button, button { color: white; padding: 5px 10px; margin: 2px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em; text-decoration: none; display: inline-block; }
+        .rerun-button { background-color: #17a2b8; }
+        .rerun-button:hover { background-color: #138496; }
+        .delete-button { background-color: #dc3545; }
+        .delete-button:hover { background-color: #c82333; }
+        .logs-button { background-color: #6c757d; }
+        .logs-button:hover { background-color: #5a6268; }
+        .log-container { max-height: 300px; overflow-y: auto; background-color: #333; color: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; white-space: pre-wrap; margin-top: 10px; display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Admin Dashboard</h1>
+        <p><a href="{{ url_for('submit.submit_job_form') }}">Back to Home</a> | <a href="{{ url_for('settings.settings_page') }}">Global Settings</a> | <a href="{{ url_for('podcasts.list_podcasts') }}">Manage Podcasts</a> | <a href="{{ url_for('templates.list_templates') }}">Manage Templates</a></p>
+        
+        {% include '_flash_messages.html' %}
+
+        <h2>Active Jobs</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Status</th>
+                    <th>Episode</th>
+                    <th>Submitted</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for job in jobs %}
+                <tr>
+                    <td>{{ job.id }}</td>
+                    <td id="status-{{ job.id }}">{{ job.status }}</td>
+                    <td>{{ job.episode_topic or 'N/A' }} (Ep #{{ job.episode_number or 'N/A' }})</td>
+                    <td>{{ job.created_at | local_time if job.created_at else 'N/A' }}</td>
+                    <td>
+                        <button class="logs-button" onclick="toggleLogs({{ job.id }}, this)">View Logs</button>
+                    </td>
+                </tr>
+                <tr id="log-row-{{ job.id }}" style="display: none;">
+                    <td colspan="5"><div id="log-container-{{ job.id }}" class="log-container"></div></td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5">No active jobs.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <h2 style="margin-top: 40px;">Job History (Last 50)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Status</th>
+                    <th>Episode</th>
+                    <th>Last Updated</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for job in job_history %}
+                <tr>
+                    <td>{{ job.id }}</td>
+                    <td>{{ job.status }}</td>
+                    <td>{{ job.episode_topic or 'N/A' }} (Ep #{{ job.episode_number or 'N/A' }})</td>
+                    <td>{{ job.updated_at | local_time if job.updated_at else job.created_at | local_time }}</td>
+                    <td>
+                        <form method="post" action="{{ url_for('admin.rerun_job', job_id=job.id) }}" style="display:inline;">
+                            <button type="submit" class="rerun-button">Re-run</button>
+                        </form>
+                        <button class="logs-button" onclick="toggleLogs({{ job.id }}, this)">View Logs</button>
+                        <form method="post" action="{{ url_for('admin.delete_job', job_id=job.id) }}" onsubmit="return confirm('Are you sure you want to delete this job and its logs?');" style="display:inline;">
+                            <button type="submit" class="delete-button">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                <tr id="log-row-{{ job.id }}" style="display: none;">
+                    <td colspan="5"><div id="log-container-{{ job.id }}" class="log-container"></div></td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5">No job history found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <h2 style="margin-top: 40px;">Scheduled & Published Episodes</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>DB ID</th>
+                    <th>Ep #</th>
+                    <th>Title</th>
+                    <th>Publish At (Local)</th>
+                    <th>Spreaker ID</th>
+                    <th>Downloads</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for episode in scheduled_episodes %}
+                <tr>
+                    <td>{{ episode.id }}</td>
+                    <td>{{ episode.episode_number }}</td>
+                    <td>{{ episode.episode_topic }}</td>
+                    <td>{{ episode.publish_at_utc_iso | local_time if episode.publish_at_utc_iso else 'N/A' }}</td>
+                    <td>{{ episode.spreaker_episode_id or 'N/A' }}</td>
+                    <td>
+                        {% if episode.processed_mp3_path %}
+                            <a href="#" onclick="downloadFile({{ episode.id }}, 'mp3', this)">MP3</a>
+                        {% endif %}
+                        {% if episode.show_notes_path %}
+                            | <a href="#" onclick="downloadFile({{ episode.id }}, 'shownotes', this)">Show Notes</a>
+                        {% endif %}
+                        {% if episode.poster_path %}
+                            | <a href="#" onclick="downloadFile({{ episode.id }}, 'poster', this)">Poster</a>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <form method="post" action="{{ url_for('admin.unschedule_episode', episode_id=episode.id) }}" onsubmit="return confirm('Are you sure you want to unschedule and delete this episode record? This does not affect Spreaker.');">
+                            <button type="submit" class="delete-button">Unschedule</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7">No scheduled or published episodes found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <script>
+        async function fetchLogs(jobId) {
+            const logContainer = document.getElementById(`log-container-${jobId}`);
+            logContainer.textContent = 'Loading logs...';
+            try {
+                const response = await fetch(`/admin/get_job_logs_api/${jobId}`);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const logs = await response.json();
+                if (logs.length > 0) {
+                    logContainer.textContent = logs.map(log => `${log.timestamp}: ${log.message}`).join('\n');
+                } else {
+                    logContainer.textContent = 'No logs found for this job.';
+                }
+            } catch (error) {
+                console.error('Error fetching logs:', error);
+                logContainer.textContent = 'Error loading logs.';
+            }
+        }
+
+        function toggleLogs(jobId, button) {
+            const logRow = document.getElementById(`log-row-${jobId}`);
+            if (logRow.style.display === 'none') {
+                logRow.style.display = 'table-row';
+                button.textContent = 'Hide Logs';
+                fetchLogs(jobId);
+            } else {
+                logRow.style.display = 'none';
+                button.textContent = 'View Logs';
+            }
+        }
+
+        async function downloadFile(episodeId, fileType, element) {
+            const originalText = element.textContent;
+            element.textContent = '...';
+            element.style.pointerEvents = 'none';
+            try {
+                const response = await fetch(`/admin/get_download_url/${episodeId}/${fileType}`);
+                if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP error! status: ${response.status}`); }
+                const data = await response.json();
+                window.open(data.url, '_blank');
+            } catch (error) { console.error('Error fetching download URL:', error); alert('Could not get download link: ' + error.message);
+            } finally { element.textContent = originalText; element.style.pointerEvents = 'auto'; }
+        }
+    </script>
+</body>
+</html>

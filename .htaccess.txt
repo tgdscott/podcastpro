@@ -1,0 +1,15 @@
+# Example .htaccess for Flask WSGI deployment on DreamHost with Apache
+# You MAY need to adjust paths and directives based on DreamHost's specific setup.
+
+# Enable rewrite engine
+RewriteEngine On
+
+# Set an environment variable for Flask's secret key (recommended)
+# Replace 'your_long_random_flask_secret_key_here' with an actual secret key
+SetEnv FLASK_SECRET_KEY 'your_long_random_flask_secret_key_here'
+
+# Point to your WSGI script
+# Adjust /podbot.wsgi if your script is in a subdirectory relative to this .htaccess
+WSGIScriptAlias / /home/your_dh_username/your_domain.com/podbot_app_directory/podbot.wsgi
+# Replace /home/your_dh_username/your_domain.com/podbot_app_directory/ with the
+# ACTUAL ABSOLUTE PATH to your podbot.wsgi file on the DreamHost server.

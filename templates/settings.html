@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Application Settings</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); max-width: 800px; margin: auto; }
+        h1, h2 { color: #333; border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-top: 20px; }
+        a { color: #007bff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"], input[type="password"], input[type="number"], input[type="time"], select {
+            width: 98%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;
+        }
+        input[type="checkbox"] { margin-right: 10px; }
+        .flash-messages { list-style: none; padding: 0; }
+        .flash-messages li { padding: 10px; margin-bottom: 10px; border-radius: 4px; }
+        .flash-messages .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .flash-messages .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        button[type="submit"] { background-color: #28a745; color: white; padding: 12px 20px; font-size: 1.1em; border-radius: 5px; border: none; cursor: pointer; }
+        button[type="submit"]:hover { background-color: #218838; }
+        small { color: #6c757d; }
+        textarea { width: 98%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; }
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 4px;
+            background-color: #fdfdfd;
+        }
+        .checkbox-group label { font-weight: normal; display: flex; align-items: center; margin-bottom: 0; }
+    </style>
+</head>
+<body>
+            <div>
+                <input type="checkbox" id="enable_spreaker" name="enable_spreaker" value="true" {% if app_settings.enable_spreaker %}checked{% endif %}>
+                <label for="enable_spreaker" class="checkbox-label">Enable Spreaker Integration</label>
+            </div>
+
+            <h2>Default Spreaker Schedule Configuration (Future - Read Only For Now)</h2>
+            <p class="help-text">These settings are used by the "Schedule Next Available Slot" option. Currently managed via DB directly, UI for editing coming soon.</p>
+            <div>
+                <label for="schedule_type">Schedule Type:</label>
+                <input type="text" id="schedule_type" name="schedule_type_display" value="{{ schedule_config.schedule_type }}" readonly>
+            </div>
+            <div>
+                <label for="times_per_period">Times Per Period (e.g., per week):</label>
+                <input type="number" id="times_per_period" name="times_per_period_display" value="{{ schedule_config.times_per_period }}" readonly>
+            </div>
+            <div>
+                <label for="days_of_week">Days of Week (0=Mon, 6=Sun, comma-separated):</label>
+                <input type="text" id="days_of_week" name="days_of_week_display" value="{{ schedule_config.days_of_week }}" readonly>
+            </div>
+            <div>
+                <label for="publish_time_local">Publish Time (Local to Podcast, HH:MM):</label>
+                <input type="time" id="publish_time_local" name="publish_time_local_display" value="{{ schedule_config.publish_time_local }}" readonly>
+            </div>
+            <!-- TODO: Add field for podcast_local_timezone_str -->
+
+            <div>
+                <input type="submit" value="Save Settings">
+            </div>
+        </form>
+    </div>
+</body>
+</html>

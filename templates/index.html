@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Podcast Job Submission</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 40px;
+            background-color: #f8f9fa;
+            color: #212529;
+            line-height: 1.6;
+        }
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            max-width: 700px;
+            margin: auto;
+        }
+        h1, h2 {
+            text-align: center;
+            color: #343a40;
+            margin-bottom: 25px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #495057;
+        }
+        input[type="text"],
+        input[type="file"],
+        input[type="number"],
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            transition: background-color 0.3s ease;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #preview-breaks-btn {
+            background-color: #28a745;
+        }
+        #preview-breaks-btn:hover {
+            background-color: #218838;
+        }
+        .note {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        #timeline {
+            margin-top: 20px;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            min-height: 50px;
+            border-radius: 4px;
+            background-color: #e9ecef;
+        }
+        #timeline ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        #timeline li {
+            background-color: #fff;
+            padding: 8px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        #timeline li:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Submit Podcast Job</h1>
+        
+        <form action="/submit_job" method="post" enctype="multipart/form-data">
+            
+            <h2>Episode Details</h2>
+            <div class="form-group">
+                <label for="podcast_title">Podcast Title:</label>
+                <input type="text" id="podcast_title" name="podcast_title" required>
+            </div>
+
+            <div class="form-group">
+                <label for="episode_topic">Episode Topic:</label>
+                <textarea id="episode_topic" name="episode_topic" required></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="audio_file">Upload Audio File:</label>
+                <input type="file" id="audio_file" name="audio_file" accept="audio/*" required>
+                <div class="note">Supported formats include MP3, WAV, M4A.</div>
+            </div>
+
+            <h2>Commercial Settings</h2>
+            <div class="form-group">
+                <label for="silence_threshold">Silence Threshold (dBFS):</label>
+                <input type="number" id="silence_threshold" name="silence_threshold" value="-40" required>
+                 <div class="note">Negative number, e.g., -40. Quieter than this is considered silence.</div>
+            </div>
+
+            <div class="form-group">
+                <label for="min_silence_len">Minimum Silence Duration (ms):</label>
+                <input type="number" id="min_silence_len" name="min_silence_len" value="1000" min="100" required>
+                <div class="note">A gap must be at least this long to be considered for a break.</div>
+            </div>
+
+            <div class="form-group">
+                <button type="button" id="preview-breaks-btn">Preview Breaks</button>
+            </div>
+            <div id="timeline">
+                <p>Break point preview will appear here...</p>
+            </div>
+
+            <hr style="margin: 30px 0;">
+
+            <button type="submit">Submit Full Processing Job</button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('preview-breaks-btn').addEventListener('click', function() {
+            const fileInput = document.querySelector('input[type="file"][name="audio_file"]');
+            const timelineDiv = document.getElementById('timeline');
+            
+            if (!fileInput.files || fileInput.files.length === 0) {
+                timelineDiv.innerHTML = '<p style="color: red; font-weight: bold;">Please select an audio file first.</p>';
+                return;
+            }
+
+            const audioFile = fileInput.files[0];
+            const formData = new FormData();
+            formData.append('audio_file', audioFile);
+
+            // You can add other form fields to formData here if your endpoint needs them
+            // Example:
+            // const silenceThreshold = document.getElementById('silence_threshold').value;
+            // formData.append('silence_threshold', silenceThreshold);
+
+            timelineDiv.innerHTML = '<p><em>Analyzing audio, please wait...</em></p>';
+
+            // The fetch request points to our new endpoint
+            fetch('/preview_breaks', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    // Handle HTTP errors like 404, 500 etc.
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.error) {
+                    timelineDiv.innerHTML = `<p style="color: red; font-weight: bold;">Error: ${data.error}</p>`;
+                } else if (data.breaks && data.breaks.length > 0) {
+                    let breaksHtml = '<strong>Detected Break Points (in seconds):</strong><ul>';
+                    data.breaks.forEach(ts => {
+                        breaksHtml += `<li>${ts.toFixed(2)}</li>`;
+                    });
+                    breaksHtml += '</ul>';
+                    timelineDiv.innerHTML = breaksHtml;
+                } else {
+                    timelineDiv.innerHTML = '<p>No break points were detected based on the current settings.</p>';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                timelineDiv.innerHTML = '<p style="color: red; font-weight: bold;">A network or server error occurred. Could not get preview.</p>';
+            });
+        });
+    </script>
+
+</body>
+</html>

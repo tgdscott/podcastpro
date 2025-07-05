@@ -1,0 +1,36 @@
+# This file tells Docker and Google Cloud Build which files to ignore
+# when creating the container. This results in a smaller, faster, and
+# more reliable build.
+
+# IDE and editor-specific files
+.vscode/
+*.code-workspace
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local database files that should not be in the container
+*.db
+*.sqlite3
+
+# Archives and local config
+*.zip
+config.sh
+setup-cloud-environment.sh
+deploy.sh
+
+# Standalone GUI and old/unused scripts
+cinema_irl_app_fixed.py
+cinema_irl.service
+manual_db_migrate.py
+manual_db_sync.py
+
+# Note files and misc
+completed.txt
+future_changes.txt
+NewDay.txt
+redesign.txt
+.htaccess*

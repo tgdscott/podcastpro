@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Submit Podcast Job</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Submit Podcast Job</h1>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flashes">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <form action="{{ url_for('submit.submit_job_form') }}" method="post" enctype="multipart/form-data">
+            
+            <h2>Episode Details</h2>
+            <div class="form-group">
+                <label>Podcast:</label>
+                <p><strong>Cinema IRL Podcast</strong></p> {# Display the name of your single podcast #}
+                <input type="hidden" id="podcast_id" name="podcast_id" value="1"> {# Hardcode podcast_id to 1 #}
+            </div>
+            <div class="form-group">
+                <label for="episode_number">Episode Number:</label>
+                <input type="text" id="episode_number" name="episode_number" required>
+            </div>  
+            <div class="form-group">
+                <label for="episode_topic">Episode Topic:</label>
+                <textarea id="episode_topic" name="episode_topic" rows="4" required></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="audio_file">Upload Audio File:</label>
+                <input type="file" id="audio_file" name="audio_file" accept="audio/*" required>
+                <div class="note">Supported formats include MP3, WAV, M4A.</div>
+            </div>
+
+            <div class="form-group">
+                <label for="ai_intro_text">AI Intro Text (Optional):</label>
+                <textarea id="ai_intro_text" name="ai_intro_text" rows="3"></textarea>
+                <div class="note">Text for a custom AI-generated intro. Leave blank for default.</div>
+            </div>
+
+            <hr style="margin: 30px 0;">
+
+            <button type="submit">Submit Full Processing Job</button>
+        </form>
+    </div>
+</body>
+</html>

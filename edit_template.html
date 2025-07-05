@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ 'Edit' if form_action == 'edit' else 'Create' }} Template: {{ template_filename or 'New Template' }}</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); max-width: 900px; margin: auto; }
+        h1, h2 { color: #333; border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-top: 20px; }
+        a { color: #007bff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"], input[type="number"], textarea {
+            width: 98%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;
+        }
+        input[type="checkbox"] { margin-right: 10px; }
+        .flash-messages { list-style: none; padding: 0; }
+        .flash-messages li { padding: 10px; margin-bottom: 10px; border-radius: 4px; }
+        .flash-messages .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .flash-messages .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .submit-button { background-color: #28a745; color: white; padding: 12px 20px; font-size: 1.1em; border-radius: 5px; border: none; cursor: pointer; }
+        .submit-button:hover { background-color: #218838; }
+        .section-placeholder {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            text-align: center;
+            color: #777;
+            background-color: #fafafa;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .segments-container { border: 1px solid #ddd; padding: 15px; border-radius: 5px; margin-top: 20px; background-color: #fdfdfd; }
+        .segment-row { display: flex; flex-wrap: wrap; align-items: center; border-bottom: 1px solid #eee; padding: 10px 0; }
+        .segment-row:last-child { border-bottom: none; }
+        .segment-field { margin-right: 10px; margin-bottom: 5px; }
+        .segment-field label { font-size: 0.8em; color: #555; display: block; }
+        .segment-field input, .segment-field select { padding: 5px; font-size: 0.9em; border: 1px solid #ccc; border-radius: 3px; }
+        .segment-actions { margin-left: auto; padding-left: 15px; }
+        .delete-segment-btn { background-color: #e74c3c; color: white; border: none; padding: 5px 8px; cursor: pointer; border-radius: 3px; font-size: 0.9em; }
+        .move-segment-btn { background-color: #6c757d; color: white; border: none; padding: 5px 8px; cursor: pointer; border-radius: 3px; font-size: 0.9em; margin-left: 5px; }
+        .move-segment-btn:hover { background-color: #5a6268; }
+        .add-segment-btn { background-color: #3498db; color: white; border: none; padding: 8px 12px; cursor: pointer; border-radius: 3px; margin-top: 10px; }
+        /* Styles for audio files - similar to segments */
+        .audio-file-row { display: flex; flex-wrap: wrap; align-items: center; border-bottom: 1px solid #eee; padding: 10px 0; }
+        .audio-file-row:last-child { border-bottom: none; }
+        .audio-file-field { margin-right: 10px; margin-bottom: 5px; flex-grow: 1; }
+        .audio-file-field.key { flex-grow: 0; flex-basis: 250px; }
+        .audio-file-actions { margin-left: auto; padding-left: 15px; }
+        .delete-audio-file-btn { background-color: #e74c3c; color: white; border: none; padding: 5px 8px; cursor: pointer; border-radius: 3px; font-size: 0.9em; }
+        .add-audio-file-btn { background-color: #3498db; color: white; border: none; padding: 8px 12px; cursor: pointer; border-radius: 3px; margin-top: 10px; }
+    </style>
+    <style>
+        /* Styles for background music beds - similar to segments but distinct */
+        .music-bed-row { display: flex; flex-wrap: wrap; align-items: center; border-bottom: 1px solid #eee; padding: 10px 0; }
+        .music-bed-row:last-child { border-bottom: none; }
+        .music-bed-field { margin-right: 10px; margin-bottom: 5px; }
+        .music-bed-field label { font-size: 0.8em; color: #555; display: block; }
+        .music-bed-field input, .music-bed-field select { padding: 5px; font-size: 0.9em; border: 1px solid #ccc; border-radius: 3px; }
+        .music-bed-actions { margin-left: auto; padding-left: 15px; }
+        .delete-music-bed-btn { background-color: #e74c3c; color: white; border: none; padding: 5px 8px; cursor: pointer; border-radius: 3px; font-size: 0.9em; }
+        .move-music-bed-btn { background-color: #6c757d; color: white; border: none; padding: 5px 8px; cursor: pointer; border-radius: 3px; font-size: 0.9em; margin-left: 5px; }
+        .move-music-bed-btn:hover { background-color: #5a6268; }
+        .add-music-bed-btn { background-color: #3498db; color: white; border: none; padding: 8px 12px; cursor: pointer; border-radius: 3px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+<div class="container">
+        <h1>{{ 'Edit' if form_action == 'edit' else 'Create' }} Template: {{ template_filename or 'New Template' }}</h1>
+        <p><a href="{{ url_for('templates.list_templates') }}">Back to Template List</a></p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <ul class="flash-messages">
+            {% for category, message in messages %}
+              <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+
+        <form method="post">
+            {% if form_action == 'new' %}
+            <div class="form-group">
+                <label for="filename">Template Filename</label>
+                <input type="text" id="filename" name="filename" value="{{ template_filename | default('', true) }}" required>
+                <small>A .json extension will be added if not provided.</small>
+            </div>
+            {% endif %}
+            <h2>General Configuration</h2>
+            <div class="form-group">
+                <label for="podcast_title">Podcast Title (for Spreaker title template)</label>
+                <input type="text" id="podcast_title" name="podcast_title" value="{{ template_data.config.podcast_title | default('', true) }}">
+            </div>
+            <div class="form-group">
+                <label for="spreaker_title_template">Spreaker Title Template</label>
+                <input type="text" id="spreaker_title_template" name="spreaker_title_template" value="{{ template_data.config.spreaker_title_template | default('Ep {episode_number}: {episode_topic}', true) }}">
+                <small>Variables: {episode_number}, {episode_topic}, {podcast_title}</small>
+            </div>
+            <h2>Ordered Segments</h2>
+            <div id="segments-editor">
+                <div id="segments-container" class="segments-container">
+                    <!-- Segments will be dynamically inserted here by JavaScript -->
+                </div>
+                <button type="button" id="add-segment-btn" class="add-segment-btn">Add Segment</button>
+            </div>
+
+            <h2 style="margin-top: 30px;">Background Music Beds</h2>
+            <div id="music-beds-editor">
+                <div id="music-beds-container" class="segments-container">
+                    <!-- Music beds will be dynamically inserted here by JavaScript -->
+                </div>
+                <button type="button" id="add-music-bed-btn" class="add-music-bed-btn">Add Music Bed</button>
+            </div>
+
+            <h2 style="margin-top: 30px;">Audio Files</h2>
+            <div id="audio-files-editor">
+                <div id="audio-files-container" class="segments-container">
+                    <!-- Audio files will be dynamically inserted here by JavaScript -->
+                </div>
+                <button type="button" id="add-audio-file-btn" class="add-audio-file-btn">Add Audio File</button>
+            </div>
+            
+            <h2 style="margin-top: 30px;">Integrations &amp; Processing Rules</h2>
+            <div class="segments-container">
+                <h3>ElevenLabs AI Voice</h3>
+                <div class="form-group">
+                    <label><input type="checkbox" name="elevenlabs_enabled" value="true" {% if template_data.elevenlabs and template_data.elevenlabs.enabled %}checked{% endif %}> Enable ElevenLabs for this template</label>
+                </div>
+                <div class="form-group">
+                    <label for="elevenlabs_voice_id">Default Voice ID</label>
+                    <input type="text" id="elevenlabs_voice_id" name="elevenlabs_voice_id" value="{{ template_data.elevenlabs.voice_id | default('', true) }}" placeholder="e.g., 19B4gjtpL5m876wS3Dfg">
+                </div>
+                <h3>Stop Word Detection</h3>
+                <div class="form-group">
+                    <label><input type="checkbox" name="stop_word_enabled" value="true" {% if template_data.stop_word and template_data.stop_word.enabled %}checked{% endif %}> Enable stop word detection</label>
+                </div>
+                <div class="form-group">
+                    <label for="stop_word_text">Stop Word</label>
+                    <input type="text" id="stop_word_text" name="stop_word_text" value="{{ template_data.stop_word.word | default('', true) }}" placeholder="e.g., pineapple">
+                </div>
+
+                <h3>Commercial Break Settings</h3>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="commercial_breaks_enabled" name="commercial_breaks_enabled" value="true" {% if template_data.commercial_breaks and template_data.commercial_breaks.enabled %}checked{% endif %}>
+                        Enable Commercial Breaks for this template
+                    </label>
+                </div>
+                <div id="commercial_break_options" style="display: {% if template_data.commercial_breaks and template_data.commercial_breaks.enabled %}block{% else %}none{% endif %};">
+                    <div class="form-group">
+                        <label for="commercial_breaks_count">Number of Commercial Breaks:</label>
+                        <input type="number" id="commercial_breaks_count" name="commercial_breaks_count" value="{{ template_data.commercial_breaks.break_count | default('1', true) }}" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="commercial_breaks_min_duration_between_sec">Min Duration Between Breaks (seconds):</label>
+                        <input type="number" step="1" id="commercial_breaks_min_duration_between_sec" name="commercial_breaks_min_duration_between_sec" value="{{ template_data.commercial_breaks.min_duration_between_breaks_sec | default('300', true) }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="commercial_breaks_max_duration_between_sec">Max Duration Between Breaks (seconds):</label>
+                        <input type="number" step="1" id="commercial_breaks_max_duration_between_sec" name="commercial_breaks_max_duration_between_sec" value="{{ template_data.commercial_breaks.max_duration_between_breaks_sec | default('600', true) }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="commercial_breaks_min_silence_ms">Min Silence for Break (milliseconds):</label>
+                        <input type="number" step="100" id="commercial_breaks_min_silence_ms" name="commercial_breaks_min_silence_ms" value="{{ template_data.commercial_breaks.min_silence_for_break_ms | default('1000', true) }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="commercial_breaks_cue_phrases">Cue Phrases (comma-separated, optional):</label>
+                        <textarea id="commercial_breaks_cue_phrases" name="commercial_breaks_cue_phrases" rows="2" placeholder="e.g., commercial break, ad time">{{ template_data.commercial_breaks.cue_phrases | join(', ') | default('', true) }}</textarea>
+                        <small>If specified, the system will prioritize silences near these spoken phrases.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="commercial_breaks_audio_keys">Commercial Audio Keys (comma-separated, from Audio Files section):</label>
+                        <textarea id="commercial_breaks_audio_keys" name="commercial_breaks_audio_keys" rows="2" placeholder="e.g., ad_1, ad_2">{{ template_data.commercial_breaks.commercial_audio_keys | join(', ') | default('', true) }}</textarea>
+                        <small>These keys must correspond to audio files defined in the "Audio Files" section above.</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 30px;">
+                <button type="submit" class="submit-button">Save Template</button>
+            </div>
+        </form>
+    </div>
+    <!-- Hidden template for a new segment row -->
+    <template id="segment-template">
+        <div class="segment-row">
+            <div class="segment-field">
+                <label>Name</label>
+                <input type="text" name="segment_name" placeholder="e.g., Intro" required>
+            </div>
+            <div class="segment-field">
+                <label>Type</label>
+                <select name="segment_type">
+                    <option value="file">File</option>
+                    <option value="generated">Generated (AI)</option>
+                    <option value="recording">Recording</option>
+                    <option value="silence">Silence</option>
+                </select>
+            </div>
+            <div class="segment-field">
+                <label>Source Key / Duration (ms)</label>
+                <input type="text" name="segment_source_key" placeholder="e.g., intro_audio or 1000">
+            </div>
+            <div class="segment-field">
+                <label>Role</label>
+                <input type="text" name="segment_role" placeholder="e.g., intro">
+            </div>
+            <div class="segment-actions">
+                <button type="button" class="move-segment-btn move-up-btn">▲ Up</button>
+                <button type="button" class="move-segment-btn move-down-btn">▼ Down</button>
+                <button type="button" class="delete-segment-btn">Delete</button>
+            </div>
+        </div>
+    </template>
+
+    <!-- Hidden template for a new audio file row -->
+    <template id="audio-file-template">
+        <div class="audio-file-row">
+            <div class="audio-file-field key">
+                <label>Key</label>
+                <input type="text" name="audio_file_key" placeholder="e.g., intro_music" required>
+            </div>
+            <div class="audio-file-field">
+                <label>Path</label>
+                <input type="text" name="audio_file_path" placeholder="e.g., assets/intro.mp3 or /path/to/file.mp3">
+                <input type="file" class="audio-file-upload-input" style="display: none;" accept=".mp3,.wav,.m4a">
+                <button type="button" class="upload-audio-file-btn">Upload</button>
+            </div>
+            <div class="audio-file-actions">
+                <button type="button" class="delete-audio-file-btn">Delete</button>
+            </div>
+        </div>
+    </template>
+
+    <!-- Hidden template for a new music bed row -->
+    <template id="music-bed-template">
+        <div class="music-bed-row">
+            <div class="music-bed-field">
+                <label>Name</label>
+                <input type="text" name="music_bed_name" placeholder="e.g., Main Theme" required>
+            </div>
+            <div class="music-bed-field">
+                <label>Source Key</label>
+                <input type="text" name="music_bed_source_key" placeholder="e.g., background_audio" required>
+            </div>
+            <div class="music-bed-field">
+                <label>Volume (dB)</label>
+                <input type="number" name="music_bed_volume_db" value="0" step="0.1">
+            </div>
+            <div class="music-bed-field">
+                <label>Loop?</label>
+                <input type="checkbox" name="music_bed_loop" value="true">
+            </div>
+            <div class="music-bed-field">
+                <label>Fade In (ms)</label>
+                <input type="number" name="music_bed_fade_in_ms" value="0">
+            </div>
+            <div class="music-bed-field">
+                <label>Fade Out (ms)</label>
+                <input type="number" name="music_bed_fade_out_ms" value="0">
+            </div>
+            <div class="music-bed-field">
+                <label>Start Offset (ms)</label>
+                <input type="number" name="music_bed_start_offset_ms" value="0">
+            </div>
+            <div class="music-bed-field">
+                <label>End Offset (ms)</label>
+                <input type="number" name="music_bed_end_offset_ms" value="0">
+            </div>
+            <div class="music-bed-actions">
+                <button type="button" class="move-music-bed-btn move-up-btn">▲ Up</button>
+                <button type="button" class="move-music-bed-btn move-down-btn">▼ Down</button>
+                <button type="button" class="delete-music-bed-btn">Delete</button>
+            </div>
+        </div>
+    </template>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const segmentsContainer = document.getElementById('segments-container');
+        const addSegmentBtn = document.getElementById('add-segment-btn');
+        const segmentTemplate = document.getElementById('segment-template');
+        
+        const existingSegments = {{ template_data.ordered_segments | tojson | safe }};
+
+        function createSegmentRow(segmentData = {}) {
+            const content = segmentTemplate.content.cloneNode(true);
+            const segmentRow = content.querySelector('.segment-row');
+            segmentRow.querySelector('[name="segment_name"]').value = segmentData.name || '';
+            segmentRow.querySelector('[name="segment_type"]').value = segmentData.type || 'file';
+            const sourceValue = segmentData.source_key || (segmentData.type === 'silence' ? segmentData.duration_ms : '') || '';
+            segmentRow.querySelector('[name="segment_source_key"]').value = sourceValue;
+            segmentRow.querySelector('[name="segment_role"]').value = segmentData.role || '';
+            segmentRow.querySelector('.delete-segment-btn').addEventListener('click', function() { segmentRow.remove(); });
+            segmentRow.querySelector('.move-up-btn').addEventListener('click', function() {
+                const currentSegment = this.closest('.segment-row');
+                const previousSegment = currentSegment.previousElementSibling;
+                if (previousSegment && previousSegment.classList.contains('segment-row')) {
+                    segmentsContainer.insertBefore(currentSegment, previousSegment);
+                }
+            });
+            segmentRow.querySelector('.move-down-btn').addEventListener('click', function() {
+                const currentSegment = this.closest('.segment-row');
+                const nextSegment = currentSegment.nextElementSibling;
+                if (nextSegment && nextSegment.classList.contains('segment-row')) {
+                    segmentsContainer.insertBefore(nextSegment, currentSegment);
+                }
+            });
+            return segmentRow;
+        }
+
+        function renderInitialSegments() {
+            if (existingSegments && existingSegments.length > 0) {
+                existingSegments.forEach(segment => { segmentsContainer.appendChild(createSegmentRow(segment)); });
+            } else {
+                segmentsContainer.innerHTML = '<p style="text-align:center; color: #888;">No segments defined. Click "Add Segment" to start.</p>';
+            }
+        }
+
+        addSegmentBtn.addEventListener('click', function() {
+            if (segmentsContainer.querySelector('p')) { segmentsContainer.innerHTML = ''; }
+            segmentsContainer.appendChild(createSegmentRow());
+        });
+
+        // --- Background Music Beds Logic ---
+        const musicBedsContainer = document.getElementById('music-beds-container');
+        const addMusicBedBtn = document.getElementById('add-music-bed-btn');
+        const musicBedTemplate = document.getElementById('music-bed-template');
+        const existingMusicBeds = {{ template_data.background_music_beds | tojson | safe }};
+
+        function createMusicBedRow(bedData = {}) {
+            const content = musicBedTemplate.content.cloneNode(true);
+            const musicBedRow = content.querySelector('.music-bed-row');
+            musicBedRow.querySelector('[name="music_bed_name"]').value = bedData.name || '';
+            musicBedRow.querySelector('[name="music_bed_source_key"]').value = bedData.source_key || '';
+            musicBedRow.querySelector('[name="music_bed_volume_db"]').value = bedData.volume_db !== undefined ? bedData.volume_db : 0;
+            musicBedRow.querySelector('[name="music_bed_loop"]').checked = bedData.loop || false;
+            musicBedRow.querySelector('[name="music_bed_fade_in_ms"]').value = bedData.fade_in_ms !== undefined ? bedData.fade_in_ms : 0;
+            musicBedRow.querySelector('[name="music_bed_fade_out_ms"]').value = bedData.fade_out_ms !== undefined ? bedData.fade_out_ms : 0;
+            musicBedRow.querySelector('[name="music_bed_start_offset_ms"]').value = bedData.start_offset_ms !== undefined ? bedData.start_offset_ms : 0;
+            musicBedRow.querySelector('[name="music_bed_end_offset_ms"]').value = bedData.end_offset_ms !== undefined ? bedData.end_offset_ms : 0;
+            musicBedRow.querySelector('.delete-music-bed-btn').addEventListener('click', function() { musicBedRow.remove(); });
+            musicBedRow.querySelector('.move-up-btn').addEventListener('click', function() {
+                const currentBed = this.closest('.music-bed-row');
+                const previousBed = currentBed.previousElementSibling;
+                if (previousBed && previousBed.classList.contains('music-bed-row')) { musicBedsContainer.insertBefore(currentBed, previousBed); }
+            });
+            musicBedRow.querySelector('.move-down-btn').addEventListener('click', function() {
+                const currentBed = this.closest('.music-bed-row');
+                const nextBed = currentBed.nextElementSibling;
+                if (nextBed && nextBed.classList.contains('music-bed-row')) { musicBedsContainer.insertBefore(nextBed, currentBed); }
+            });
+            return musicBedRow;
+        }
+
+        function renderInitialMusicBeds() {
+            if (existingMusicBeds && existingMusicBeds.length > 0) {
+                existingMusicBeds.forEach(bed => { musicBedsContainer.appendChild(createMusicBedRow(bed)); });
+            } else {
+                musicBedsContainer.innerHTML = '<p style="text-align:center; color: #888;">No background music beds defined. Click "Add Music Bed" to start.</p>';
+            }
+        }
+
+        addMusicBedBtn.addEventListener('click', function() {
+            if (musicBedsContainer.querySelector('p')) { musicBedsContainer.innerHTML = ''; }
+            musicBedsContainer.appendChild(createMusicBedRow());
+        });
+
+        // --- Audio Files Logic ---
+        const audioFilesContainer = document.getElementById('audio-files-container');
+        const addAudioFileBtn = document.getElementById('add-audio-file-btn');
+        const audioFileTemplate = document.getElementById('audio-file-template');
+        const existingAudioFiles = {{ template_data.audio_files | tojson | safe }};
+
+        function createAudioFileRow(key = '', path = '') {
+            const content = audioFileTemplate.content.cloneNode(true);
+            const audioFileRow = content.querySelector('.audio-file-row');
+            audioFileRow.querySelector('[name="audio_file_key"]').value = key;
+            audioFileRow.querySelector('[name="audio_file_path"]').value = path;
+            audioFileRow.querySelector('.delete-audio-file-btn').addEventListener('click', function() { audioFileRow.remove(); });
+            return audioFileRow;
+        }
+
+        function renderInitialAudioFiles() {
+            if (existingAudioFiles && Object.keys(existingAudioFiles).length > 0) {
+                for (const [key, path] of Object.entries(existingAudioFiles)) {
+                    audioFilesContainer.appendChild(createAudioFileRow(key, path));
+                }
+            } else {
+                audioFilesContainer.innerHTML = '<p style="text-align:center; color: #888;">No audio files defined. Click "Add Audio File" to start.</p>';
+            }
+        }
+
+        addAudioFileBtn.addEventListener('click', function() {
+            if (audioFilesContainer.querySelector('p')) { audioFilesContainer.innerHTML = ''; }
+            audioFilesContainer.appendChild(createAudioFileRow());
+        });
+
+        // Initial render
+        renderInitialSegments();
+        renderInitialMusicBeds();
+        renderInitialAudioFiles();
+
+        // Commercial Breaks Toggle Logic
+        const commercialBreaksEnabledCheckbox = document.getElementById('commercial_breaks_enabled');
+        const commercialBreakOptionsDiv = document.getElementById('commercial_break_options');
+
+        function toggleCommercialBreakOptions() {
+            if (commercialBreaksEnabledCheckbox.checked) {
+                commercialBreakOptionsDiv.style.display = 'block';
+            } else {
+                commercialBreakOptionsDiv.style.display = 'none';
+            }
+        }
+
+        // Initial call and event listener
+        toggleCommercialBreakOptions();
+        commercialBreaksEnabledCheckbox.addEventListener('change', toggleCommercialBreakOptions);
+
+        // --- Audio File Upload Logic ---
+        const templateFilename = "{{ template_filename }}"; // Get the current template filename from Jinja
+
+        // Function to attach event listeners to a new audio file row
+        function attachUploadListeners(row) {
+            const uploadButton = row.querySelector('.upload-audio-file-btn');
+            const fileInput = row.querySelector('.audio-file-upload-input');
+            const pathInput = row.querySelector('[name="audio_file_path"]');
+
+            uploadButton.addEventListener('click', () => {
+                fileInput.click(); // Trigger the hidden file input
+            });
+
+            fileInput.addEventListener('change', async () => {
+                if (fileInput.files.length === 0) {
+                    return;
+                }
+
+                const file = fileInput.files[0];
+                const formData = new FormData();
+                formData.append('audio_file', file);
+
+                // Disable inputs during upload
+                pathInput.disabled = true;
+                uploadButton.disabled = true;
+                uploadButton.textContent = 'Uploading...';
+
+                try {
+                    const response = await fetch(`/templates/upload_audio_asset/${templateFilename}`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Upload failed');
+                    }
+
+                    const data = await response.json();
+                    pathInput.value = data.file_path; // Set the returned relative path
+                    alert('File uploaded successfully!');
+                } catch (error) {
+                    console.error('Error uploading file:', error);
+                    alert(`Error uploading file: ${error.message}`);
+                } finally {
+                    pathInput.disabled = false;
+                    uploadButton.disabled = false;
+                    uploadButton.textContent = 'Upload';
+                    fileInput.value = ''; // Clear the file input
+                }
+            });
+        }
+
+        // Attach listeners to existing rows
+        document.querySelectorAll('.audio-file-row').forEach(attachUploadListeners);
+
+        // Modify addAudioFileBtn to also attach listeners to new rows
+        addAudioFileBtn.addEventListener('click', function() {
+            if (audioFilesContainer.querySelector('p')) { audioFilesContainer.innerHTML = ''; }
+            const newRow = createAudioFileRow();
+            audioFilesContainer.appendChild(newRow);
+            attachUploadListeners(newRow); // Attach listeners to the newly created row
+        });
+    });
+    </script>
+</body>
+</html>

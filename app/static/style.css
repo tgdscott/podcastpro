@@ -1,0 +1,195 @@
+/* General body styling for better visual context */
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background-color: #f4f7f6;
+    color: #333;
+    line-height: 1.6;
+}
+
+/* Styles for the 'Preview Breaks' button */
+#preview-breaks-btn {
+    background-color: #4CAF50; /* Green */
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    margin-top: 20px;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    display: block; /* Ensures button takes its own line */
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 200px; /* Constrain button width */
+    text-align: center;
+}
+
+#preview-breaks-btn:hover {
+    background-color: #45a049;
+    transform: translateY(-2px);
+}
+
+#preview-breaks-btn:active {
+    background-color: #3e8e41;
+    transform: translateY(0);
+}
+
+/* Styles for the display area for detected break points */
+#break-points-display {
+    background-color: #ffffff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 30px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    max-height: 500px; /* Limit height for scrolling */
+    overflow-y: auto; /* Enable vertical scrolling */
+}
+
+#break-points-display h2 {
+    color: #34495e;
+    margin-top: 0;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+}
+
+/* Styles for the list of break points */
+#break-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.break-item {
+    background-color: #f9f9f9;
+    border: 1px solid #eee;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 1em;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: background-color 0.2s ease;
+}
+
+.break-item:hover {
+    background-color: #f0f0f0;
+}
+
+.break-item:last-child {
+    margin-bottom: 0;
+}
+
+.break-item .break-time {
+    font-weight: bold;
+    color: #007bff; /* Blue for time */
+    min-width: 90px; /* Ensure consistent width */
+    text-align: left;
+}
+
+.break-item .break-label {
+    flex-grow: 1; /* Allows label to take available space */
+    margin-left: 15px;
+    margin-right: 15px;
+    color: #555;
+}
+
+.break-item .break-controls {
+    display: flex;
+    gap: 8px; /* Spacing between buttons */
+}
+
+.break-item .break-controls button {
+    background-color: #007bff; /* Default blue for generic buttons */
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background-color 0.3s ease, transform 0.1s ease;
+}
+
+.break-item .break-controls button:hover {
+    transform: translateY(-1px);
+}
+
+.break-item .break-controls button:active {
+    transform: translateY(0);
+}
+
+.break-item .break-controls button.edit-break {
+    background-color: #ffc107; /* Yellow */
+    color: #333;
+}
+
+.break-item .break-controls button.edit-break:hover {
+    background-color: #e0a800;
+}
+
+.break-item .break-controls button.delete-break {
+    background-color: #dc3545; /* Red */
+}
+
+.break-item .break-controls button.delete-break:hover {
+    background-color: #c82333;
+}
+
+/* Styles for the timeline visualization */
+#timeline-container {
+    position: relative;
+    width: 100%;
+    height: 60px; /* Height of the timeline bar */
+    background-color: #e0e0e0;
+    border-radius: 10px;
+    margin-top: 25px;
+    overflow: hidden; /* Ensure markers don't go outside */
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1); /* Inner shadow for depth */
+}
+
+.timeline-bar {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to right, #a0d2eb, #bde0fe, #c7ecee); /* Gradient for aesthetic */
+    border-radius: 10px;
+}
+
+.break-marker {
+    position: absolute;
+    top: 0;
+    width: 4px; /* Width of the marker */
+    height: 100%;
+    background-color: #ff4500; /* Orange-red for markers */
+    border-radius: 2px;
+    transform: translateX(-50%); /* Center the marker on its 'left' position */
+    box-shadow: 0 0 8px rgba(255, 69, 0, 0.5); /* Glow effect */
+    cursor: pointer;
+    z-index: 10; /* Ensure markers are on top */
+    transition: width 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.break-marker:hover {
+    width: 8px; /* Slightly wider on hover */
+    background-color: #cc3700;
+    box-shadow: 0 0 12px rgba(255, 69, 0, 0.7);
+}
+
+/* Optional: Styling for when no breaks are detected */
+#break-points-display.empty-state {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+    font-style: italic;
+    background-color: #f0f3f5;
+    border: 1px dashed #c0c0c0;
+}
+
+#break-points-display.empty-state::before {
+    content: "No break points have been detected yet. Click 'Preview Breaks' to analyze the audio.";
+    display: block;
+    margin-bottom: 10px;
+}

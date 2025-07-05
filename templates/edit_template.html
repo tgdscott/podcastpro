@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% if form_action == 'new' %}Create New Template{% else %}Edit Template: {{ template_filename }}{% endif %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .form-section { border: 1px solid #444; border-radius: 8px; padding: 15px; margin-bottom: 20px; background-color: #2b2b2b; }
+        .form-section h2 { margin-top: 0; border-bottom: 1px solid #555; padding-bottom: 10px; }
+        .dynamic-list-item { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px; border-bottom: 1px solid #3a3a3a; align-items: center; }
+        .dynamic-list-item:last-child { border-bottom: none; }
+        .dynamic-list-item label { font-size: 0.9em; margin-bottom: 2px; display: block; }
+        .dynamic-list-item input, .dynamic-list-item select { width: auto; flex-grow: 1; min-width: 100px; }
+        .remove-btn { background-color: #dc3545; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px; height: fit-content; align-self: flex-end; }
+        .add-btn { background-color: #28a745; color: white; border: none; padding: 8px 12px; cursor: pointer; border-radius: 4px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>{% if form_action == 'new' %}Create New Template{% else %}Edit: {{ template_filename }}{% endif %}</h1>
+        <p><a href="{{ url_for('templates.list_templates') }}">Back to Template List</a></p>
+
+        {% include '_flash_messages.html' %}
+
+        <form method="post">
+            {% if form_action == 'new' %}
+            <div class="form-group">
+                <label for="filename">New Template Filename (e.g., my_show_template.json):</label>
+                <input type="text" id="filename" name="filename" required>
+            </div>
+            {% endif %}
+
+            <div class="form-section">
+                <h2>General Config</h2>
+                <div class="form-group">
+                    <label for="podcast_title">Podcast Title:</label>
+                    <input type="text" id="podcast_title" name="podcast_title" value="{{ template_data.config.podcast_title or '' }}">
+                </div>
+                <div class="form-group">
+                    <label for="spreaker_title_template">Spreaker Title Template:</label>
+                    <input type="text" id="spreaker_title_template" name="spreaker_title_template" value="{{ template_data.config.spreaker_title_template or '' }}" placeholder="e.g., Ep {episode_number}: {episode_topic}">
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h2>Integrations</h2>
+                <div>
+                    <input type="checkbox" id="elevenlabs_enabled" name="elevenlabs_enabled" {% if template_data.elevenlabs.enabled %}checked{% endif %}>
+                    <label for="elevenlabs_enabled">Enable ElevenLabs</label>
+                </div>
+                <div class="form-group">
+                    <label for="elevenlabs_voice_id">ElevenLabs Voice ID:</label>
+                    <input type="text" id="elevenlabs_voice_id" name="elevenlabs_voice_id" value="{{ template_data.elevenlabs.voice_id or '' }}">
+                </div>
+                <hr style="border-color: #444; margin: 15px 0;">
+                <div>
+                    <input type="checkbox" id="stop_word_enabled" name="stop_word_enabled" {% if template_data.stop_word.enabled %}checked{% endif %}>
+                    <label for="stop_word_enabled">Enable Stop Word Detection</label>
+                </div>
+                <div class="form-group">
+                    <label for="stop_word_text">Stop Word:</label>
+                    <input type="text" id="stop_word_text" name="stop_word_text" value="{{ template_data.stop_word.word or '' }}">
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h2>Audio Files</h2>
+                <div id="audio-files-list">
+                    {% for key, path in template_data.audio_files.items() %}
+                    <div class="dynamic-list-item">
+                        <div><label>Key</label><input type="text" name="audio_file_key" value="{{ key }}" required></div>
+                        <div><label>Path</label><input type="text" name="audio_file_path" value="{{ path }}" required></div>
+                        <button type="button" class="remove-btn" onclick="this.parentElement.remove()">Remove</button>
+                    </div>
+                    {% endfor %}
+                </div>
+                <button type="button" class="add-btn" onclick="addAudioFile()">Add Audio File</button>
+            </div>
+
+            <div class="form-section">
+                <h2>Ordered Segments</h2>
+                <div id="ordered-segments-list">
+                    {% for segment in template_data.ordered_segments %}
+                    <div class="dynamic-list-item">
+                        <div><label>Name</label><input type="text" name="segment_name" value="{{ segment.name }}" required></div>
+                        <div><label>Role</label><input type="text" name="segment_role" value="{{ segment.role }}" required></div>
+                        <div><label>Type</label>
+                            <select name="segment_type" onchange="toggleSourceKey(this)">
+                                <option value="file" {% if segment.type == 'file' %}selected{% endif %}>File</option>
+                                <option value="recording" {% if segment.type == 'recording' %}selected{% endif %}>Recording</option>
+                                <option value="generated" {% if segment.type == 'generated' %}selected{% endif %}>Generated</option>
+                                <option value="silence" {% if segment.type == 'silence' %}selected{% endif %}>Silence</option>
+                            </select>
+                        </div>
+                        <div><label class="source-key-label">Source Key / Duration (ms)</label><input type="text" name="segment_source_key" value="{{ segment.source_key or segment.duration_ms or '' }}" required></div>
+                        <button type="button" class="remove-btn" onclick="this.parentElement.remove()">Remove</button>
+                    </div>
+                    {% endfor %}
+                </div>
+                <button type="button" class="add-btn" onclick="addSegment()">Add Segment</button>
+            </div>
+            
+            <div class="form-section">
+                <h2>Background Music Beds</h2>
+                <div id="music-beds-list">
+                    {% for bed in template_data.background_music_beds %}
+                    <div class="dynamic-list-item">
+                        <div><label>Name</label><input type="text" name="music_bed_name" value="{{ bed.name }}" required></div>
+                        <div><label>Source Key</label><input type="text" name="music_bed_source_key" value="{{ bed.source_key }}" required></div>
+                        <div><label>Volume (dB)</label><input type="number" name="music_bed_volume_db" value="{{ bed.volume_db or 0 }}" step="0.1"></div>
+                        <div><label>Fade In (ms)</label><input type="number" name="music_bed_fade_in_ms" value="{{ bed.fade_in_ms or 0 }}"></div>
+                        <div><label>Fade Out (ms)</label><input type="number" name="music_bed_fade_out_ms" value="{{ bed.fade_out_ms or 0 }}"></div>
+                        <div><label>Loop?</label><input type="checkbox" name="music_bed_loop" {% if bed.loop %}checked{% endif %}></div>
+                        <button type="button" class="remove-btn" onclick="this.parentElement.remove()">Remove</button>
+                    </div>
+                    {% endfor %}
+                </div>
+                <button type="button" class="add-btn" onclick="addMusicBed()">Add Music Bed</button>
+            </div>
+
+            <div class="form-group" style="margin-top: 30px;">
+                <button type="submit" class="button">{% if form_action == 'new' %}Create Template{% else %}Save Changes{% endif %}</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        function addAudioFile() {
+            const list = document.getElementById('audio-files-list');
+            const item = document.createElement('div');
+            item.className = 'dynamic-list-item';
+            item.innerHTML = `
+                <div><label>Key</label><input type="text" name="audio_file_key" required></div>
+                <div><label>Path</label><input type="text" name="audio_file_path" required></div>
+                <button type="button" class="remove-btn" onclick="this.parentElement.remove()">Remove</button>
+            `;
+            list.appendChild(item);
+        }
+
+        function addSegment() {
+            const list = document.getElementById('ordered-segments-list');
+            const item = document.createElement('div');
+            item.className = 'dynamic-list-item';
+            item.innerHTML = `
+                <div><label>Name</label><input type="text" name="segment_name" required></div>
+                <div><label>Role</label><input type="text" name="segment_role" required></div>
+                <div><label>Type</label>
+                    <select name="segment_type" onchange="toggleSourceKey(this)">
+                        <option value="file">File</option>
+                        <option value="recording">Recording</option>
+                        <option value="generated">Generated</option>
+                        <option value="silence">Silence</option>
+                    </select>
+                </div>
+                <div><label class="source-key-label">Source Key / Duration (ms)</label><input type="text" name="segment_source_key" required></div>
+                <button type="button" class="remove-btn" onclick="this.parentElement.remove()">Remove</button>
+            `;
+            list.appendChild(item);
+        }
+
+        function addMusicBed() {
+            const list = document.getElementById('music-beds-list');
+            const item = document.createElement('div');
+            item.className = 'dynamic-list-item';
+            item.innerHTML = `
+                <div><label>Name</label><input type="text" name="music_bed_name" required></div>
+                <div><label>Source Key</label><input type="text" name="music_bed_source_key" required></div>
+                <div><label>Volume (dB)</label><input type="number" name="music_bed_volume_db" value="0" step="0.1"></div>
+                <div><label>Fade In (ms)</label><input type="number" name="music_bed_fade_in_ms" value="0"></div>
+                <div><label>Fade Out (ms)</label><input type="number" name="music_bed_fade_out_ms" value="0"></div>
+                <div><label>Loop?</label><input type="checkbox" name="music_bed_loop"></div>
+                <button type="button" class="remove-btn" onclick="this.parentElement.remove()">Remove</button>
+            `;
+            list.appendChild(item);
+        }
+
+        function toggleSourceKey(selectElement) {
+            const parentItem = selectElement.closest('.dynamic-list-item');
+            const sourceKeyLabel = parentItem.querySelector('.source-key-label');
+            if (selectElement.value === 'silence') {
+                sourceKeyLabel.textContent = 'Duration (ms)';
+            } else {
+                sourceKeyLabel.textContent = 'Source Key';
+            }
+        }
+        
+        // Initialize labels on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('select[name="segment_type"]').forEach(select => {
+                toggleSourceKey(select);
+            });
+        });
+    </script>
+</body>
+</html>
