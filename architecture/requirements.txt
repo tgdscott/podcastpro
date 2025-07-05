@@ -1,0 +1,7 @@
+Flask
+gunicorn
+google-cloud-storage
+google-cloud-secret-manager
+cloud-sql-python-connector
+psycopg2-binary
+pytz

@@ -1,100 +1,156 @@
-import os
-from flask import (Blueprint, redirect, url_for, flash, render_template, jsonify, send_from_directory, current_app, request)
 import logging
-from datetime import datetime
+from flask import Blueprint, jsonify, render_template_string
 import db_manager
-import gcs_utils # Import our GCS utility
 
 logger = logging.getLogger(__name__)
 
-admin_bp = Blueprint('admin', __name__, template_folder='../../templates')
+admin_bp = Blueprint('admin', __name__)
 
-@admin_bp.route('/')
-def admin_page():
-    active_jobs = db_manager.get_all_active_jobs()
-    job_history = db_manager.get_job_history()
-    scheduled_episodes = db_manager.get_all_scheduled_episodes()
-    return render_template('admin.html', jobs=active_jobs, job_history=job_history, scheduled_episodes=scheduled_episodes)
-
-@admin_bp.route('/job_status/<int:job_id>')
-def job_status(job_id):
-    status_info = db_manager.get_job_status(job_id)
-    if status_info:
-        # Manually create the dictionary to prevent the ValueError.
-        # This assumes get_job_status returns a tuple like: (status, log_file_path)
-        status_dict = {
-            'status': status_info[0],
-            'log_file_path': status_info[1] if len(status_info) > 1 else None
-        }
-        return jsonify(status_dict)
-    else:
-        return jsonify({'status': 'not_found'})
-
-@admin_bp.route('/delete_job/<int:job_id>', methods=['POST'])
-def delete_job(job_id):
-    db_manager.delete_job(job_id)
-    flash(f"Job ID {job_id} deleted.", "success")
-    return redirect(url_for('admin.admin_page'))
-
-# Add other admin routes like rerun, unschedule, etc. here
-
-@admin_bp.route('/rerun_job/<int:job_id>', methods=['POST'])
-def rerun_job(job_id):
-    new_job_id = db_manager.recreate_job_from_existing(job_id)
-    if new_job_id:
-        flash(f"Job {job_id} re-queued as new Job ID {new_job_id}.", "success")
-    else:
-        flash(f"Failed to re-run job {job_id}.", "error")
-    return redirect(url_for('admin.admin_page'))
-
-@admin_bp.route('/get_job_logs_api/<int:job_id>')
-def get_job_logs_api(job_id):
-    """API endpoint to fetch logs for a specific job."""
-    try:
-        logs = db_manager.get_job_logs(job_id)
-        # Convert datetime objects to string for JSON serialization
-        serialized_logs = [{'timestamp': log.timestamp.isoformat(), 'message': log.message} for log in logs]
-        return jsonify(serialized_logs)
-    except Exception as e:
-        logger.error(f"Error fetching logs for job {job_id}: {e}", exc_info=True)
-        return jsonify({'error': str(e)}), 500
-
-@admin_bp.route('/unschedule_episode/<int:episode_id>', methods=['POST'])
-def unschedule_episode(episode_id):
-    db_manager.delete_scheduled_episode(episode_id) # Assuming this function exists in db_manager
-    flash(f"Scheduled episode ID {episode_id} removed from local DB.", "success")
-    return redirect(url_for('admin.admin_page'))
-
-@admin_bp.route('/get_download_url/<int:episode_id>/<file_type>')
-def get_download_url(episode_id, file_type):
-    """Generates a signed URL for a processed file stored in GCS."""
-    episode_details = db_manager.get_episode_by_id(episode_id)
+# Simple HTML admin template
+ADMIN_DASHBOARD = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Podcast Pro - Admin Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1200px; margin: 20px auto; padding: 20px; }
+        .header { border-bottom: 2px solid #007bff; padding-bottom: 20px; margin-bottom: 30px; }
+        .stats { display: flex; gap: 20px; margin-bottom: 30px; }
+        .stat-card { background: #f8f9fa; padding: 20px; border-radius: 8px; flex: 1; text-align: center; }
+        .stat-number { font-size: 2em; font-weight: bold; color: #007bff; }
+        .stat-label { color: #6c757d; }
+        .jobs-section { margin-top: 30px; }
+        .job-card { background: white; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px; margin-bottom: 15px; }
+        .job-header { display: flex; justify-content: between; align-items: center; margin-bottom: 10px; }
+        .job-title { font-weight: bold; font-size: 1.2em; }
+        .job-status { padding: 4px 12px; border-radius: 20px; font-size: 0.9em; }
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-processing { background: #cce5ff; color: #004085; }
+        .status-completed { background: #d4edda; color: #155724; }
+        .status-failed { background: #f8d7da; color: #721c24; }
+        .job-meta { color: #6c757d; font-size: 0.9em; }
+        .refresh-btn { background: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        .refresh-btn:hover { background: #218838; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Podcast Pro - Admin Dashboard</h1>
+        <button class="refresh-btn" onclick="location.reload()">Refresh</button>
+    </div>
     
-    if not episode_details:
-        return jsonify({'error': 'Episode not found in database.'}), 404
+    <div class="stats">
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.total }}</div>
+            <div class="stat-label">Total Jobs</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.pending }}</div>
+            <div class="stat-label">Pending</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.processing }}</div>
+            <div class="stat-label">Processing</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.completed }}</div>
+            <div class="stat-label">Completed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.failed }}</div>
+            <div class="stat-label">Failed</div>
+        </div>
+    </div>
+    
+    <div class="jobs-section">
+        <h2>Recent Jobs</h2>
+        {% if jobs %}
+            {% for job in jobs %}
+            <div class="job-card">
+                <div class="job-header">
+                    <div class="job-title">{{ job.title }}</div>
+                    <div class="job-status status-{{ job.status }}">{{ job.status.upper() }}</div>
+                </div>
+                <div class="job-meta">
+                    <strong>ID:</strong> {{ job.id }} | 
+                    <strong>Type:</strong> {{ job.job_type }} | 
+                    <strong>Created:</strong> {{ job.created_at }} |
+                    <strong>Priority:</strong> {{ job.priority }}
+                </div>
+                {% if job.description %}
+                <div style="margin-top: 10px; color: #495057;">{{ job.description }}</div>
+                {% endif %}
+                {% if job.file_path %}
+                <div style="margin-top: 10px; color: #6c757d; font-size: 0.9em;">
+                    <strong>File:</strong> {{ job.file_path }}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="job-card">
+                <div style="text-align: center; color: #6c757d;">No jobs found</div>
+            </div>
+        {% endif %}
+    </div>
+    
+    <p><a href="/">← Back to Submit Job</a></p>
+</body>
+</html>
+"""
 
-    gcs_uri = None
-    if file_type == 'mp3':
-        gcs_uri = episode_details.get('processed_mp3_path')
-    elif file_type == 'shownotes':
-        gcs_uri = episode_details.get('show_notes_path')
-    elif file_type == 'poster':
-        gcs_uri = episode_details.get('poster_path')
-    else:
-        return jsonify({'error': 'Invalid file type specified.'}), 400
-
-    if not gcs_uri or not gcs_uri.startswith('gs://'):
-        return jsonify({'error': f'No valid GCS path found for {file_type}. Path: {gcs_uri}'}), 404
-
-    # Extract blob name from gs://bucket-name/path/to/file
+@admin_bp.route('/admin')
+def admin_dashboard():
+    """Admin dashboard showing job statistics and recent jobs"""
     try:
-        blob_name = gcs_uri.split('/', 3)[-1]
-    except (IndexError, AttributeError):
-        return jsonify({'error': 'Invalid GCS URI format in database.'}), 500
+        # Get all jobs for statistics
+        all_jobs = db_manager.get_all_jobs()
+        
+        # Calculate statistics
+        stats = {
+            'total': len(all_jobs),
+            'pending': len([j for j in all_jobs if j.get('status') == 'pending']),
+            'processing': len([j for j in all_jobs if j.get('status') == 'processing']),
+            'completed': len([j for j in all_jobs if j.get('status') == 'completed']),
+            'failed': len([j for j in all_jobs if j.get('status') == 'failed'])
+        }
+        
+        # Get recent jobs (last 20)
+        recent_jobs = all_jobs[:20] if all_jobs else []
+        
+        return render_template_string(ADMIN_DASHBOARD, stats=stats, jobs=recent_jobs)
+        
+    except Exception as e:
+        logger.error(f"Error loading admin dashboard: {e}")
+        return f"Error loading admin dashboard: {str(e)}", 500
 
-    signed_url = gcs_utils.generate_signed_url(blob_name)
+@admin_bp.route('/api/jobs')
+def api_jobs():
+    """API endpoint to get all jobs as JSON"""
+    try:
+        jobs = db_manager.get_all_jobs()
+        return jsonify(jobs)
+        
+    except Exception as e:
+        logger.error(f"Error getting jobs: {e}")
+        return jsonify({'error': 'Failed to get jobs'}), 500
 
-    if not signed_url:
-        return jsonify({'error': 'Could not generate download URL.'}), 500
-
-    return jsonify({'url': signed_url})
+@admin_bp.route('/api/stats')
+def api_stats():
+    """API endpoint to get job statistics"""
+    try:
+        all_jobs = db_manager.get_all_jobs()
+        
+        stats = {
+            'total': len(all_jobs),
+            'pending': len([j for j in all_jobs if j.get('status') == 'pending']),
+            'processing': len([j for j in all_jobs if j.get('status') == 'processing']),
+            'completed': len([j for j in all_jobs if j.get('status') == 'completed']),
+            'failed': len([j for j in all_jobs if j.get('status') == 'failed'])
+        }
+        
+        return jsonify(stats)
+        
+    except Exception as e:
+        logger.error(f"Error getting stats: {e}")
+        return jsonify({'error': 'Failed to get stats'}), 500

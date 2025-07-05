@@ -1,0 +1,25 @@
+Future Enhancements & To-Do List:
+
+1.  **Spreaker Episode Management (Admin Page):**
+    *   Implement "Unschedule Episode" functionality on the admin page, allowing users to revert a scheduled Spreaker episode to a draft or unscheduled state using the Spreaker API (`POST /v2/episodes/EPISODE-ID` with `auto_published_at=`).
+    *   Display currently scheduled episodes (from the local `episodes` table) on the admin page.
+2.  **Schedule Configuration UI (Admin Page):**
+    *   Create an admin interface in Flask to allow users to view and modify the podcast scheduling rules stored in the `schedule_config` table (e.g., days of the week, publish time, frequency).
+
+--- Future Feature Roadmap ---
+
+1.  **Interactive Visual Timeline (Post-Submission)**
+    * **Workflow:** After initial submission, the user is redirected to a dedicated timeline page (`/job/<id>/timeline`) instead of the admin dashboard.
+    * **Visualization:** This page will display a simple visual representation of the episode's structure, including where the intro/outro and detected ad breaks are placed.
+    * **Confirmation Step:** The page will feature a "Confirm & Start Processing" button, which the user must click to enqueue the job. This gives them a final review stage.
+    * **Audio Player:** (Phase 3) The timeline will include an HTML5 audio player to allow the user to listen to the audio and scrub to the points where breaks are proposed.
+    * **Interactive Editing:** (Phase 3) Users will be able to drag-and-drop the ad break markers on the timeline to adjust their position before final confirmation.
+
+2.  **"Trust the Process" Skip Option**
+    * A checkbox will be added to the `submit_job.html` page, defaulted to OFF.
+    * If the user checks this box, the "Review Timeline" step is skipped entirely, and the job is submitted for processing immediately.
+
+3.  **Keyword-Based Ad Placement ("Say Commercial")**
+    * **Dual Logic:** The system will support two methods for ad placement: the current silence-based detection and a new keyword-based method.
+    * **Admin Setting:** A new setting will be added to the podcast configuration page allowing the user to choose their preferred method ("Automatic" or "Keyword") and to specify their trigger word (e.g., "commercial", "break", etc.).
+    * **Processing Logic:** When a job is run, it will first check the podcast's setting. If set to "Keyword," it will run a transcription first (using Whisper), find the timestamps of the trigger word, and use those for ad placement.

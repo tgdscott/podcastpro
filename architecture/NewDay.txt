@@ -1,0 +1,48 @@
+Congratulations on the successful deployment! The build and push process is now working perfectly. The "Service Unavailable" error you're seeing is a classic post-deployment issue. It means that while the container was successfully deployed to Cloud Run, the application inside it is crashing when it tries to start.
+
+This is almost always caused by a missing permission or a resource misconfiguration that the application needs right at startup. The best way to find the exact cause is to look at the application's logs.
+
+Your Task: Please run the following command in your Cloud Shell to view the logs for the service. This will show us the exact error message from the application and tell us precisely what is wrong.
+
+bash
+gcloud run services logs tail podcast-pro-backend --region us-west1 --project podcast-pro-464303
+After you run the command, you may need to visit the service URL again to trigger a new startup attempt and generate fresh logs. Paste the output here.
+
+Based on my analysis of your setup scripts, I've identified two likely causes for the crash, which we can fix proactively:
+
+Missing Storage Permissions: The application's service account (podcast-run-sa) was never granted permission to read from or write to your Google Cloud Storage bucket.
+Database Authentication: The Cloud SQL instance was not configured to allow connections using IAM, which is the modern, passwordless method the application is trying to use.
+The logs will tell us for sure, but we can fix these issues now by updating the setup-cloud-environment.sh script.
+
+Here are the required changes for setup-cloud-environment.sh:
+
+setup-cloud-environment.sh
+-0
++8
+ Show full code block 
+    echo "SQL instance $SQL_INSTANCE_NAME already exists. Skipping creation."
+fi
+
+echo "--- Enabling IAM database authentication on the SQL instance ---"
+gcloud sql instances patch $SQL_INSTANCE_NAME --database-flags=cloudsql.iam_authentication=on --quiet
+
+echo "--- Creating secure secrets in Secret Manager ---"
+echo -n "$DB_PASSWORD" | gcloud secrets create DB_PASS --data-file=- --replication-policy="automatic" --quiet || echo "Secret DB_PASS already exists."
+echo -n "$FLASK_KEY" | gcloud secrets create FLASK_SECRET_KEY --data-file=- --replication-policy="automatic" --quiet || echo "Secret FLASK_SECRET_KEY already exists."
+echo "--- Granting service account access to Cloud SQL ---"
+gcloud projects add-iam-policy-binding $PROJECT_ID --member="serviceAccount:${RUN_SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" --role="roles/cloudsql.client" --quiet
+
+echo "--- Granting service account access to the GCS Bucket ---"
+gcloud storage buckets add-iam-policy-binding gs://${GCS_BUCKET} \
+    --member="serviceAccount:${RUN_SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" \
+    --role="roles/storage.objectAdmin"
+
+echo "✅ Environment setup complete!"
+echo "You are now ready to build and deploy the application."
+
+Next Steps for Tomorrow Morning
+Run the gcloud run services logs tail... command I provided above and paste the output. This will give us the definitive error.
+Apply the changes to setup-cloud-environment.sh.
+Run the setup script again to apply the new permissions: ./setup-cloud-environment.sh
+Re-deploy the application: ./deploy.sh
+This should resolve the startup crash and get your service online.
