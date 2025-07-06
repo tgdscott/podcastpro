@@ -14,7 +14,6 @@ IS_CLOUD_ENV = bool(os.environ.get('INSTANCE_CONNECTION_NAME'))
 if IS_CLOUD_ENV:
     # Cloud SQL PostgreSQL setup
     import psycopg
-    import psycopg.extras
     from cloud_sql_python_connector import Connector
 
     INSTANCE_CONNECTION_NAME = os.environ.get('INSTANCE_CONNECTION_NAME')
