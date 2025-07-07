@@ -4,8 +4,12 @@ import sqlite3
 from datetime import datetime
 from contextlib import contextmanager
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
+# Import the new modules
+import db_api_settings
+import db_podcasts
+import db_jobs
+import db_episodes
+
 logger = logging.getLogger(__name__)
 
 # Check if running in cloud environment
@@ -13,33 +17,41 @@ IS_CLOUD_ENV = bool(os.environ.get('INSTANCE_CONNECTION_NAME'))
 
 if IS_CLOUD_ENV:
     # Cloud SQL PostgreSQL setup
-    import psycopg
-    from cloud_sql_python_connector import Connector
-
-    INSTANCE_CONNECTION_NAME = os.environ.get('INSTANCE_CONNECTION_NAME')
-    DB_USER = os.environ.get('DB_USER', 'postgres')
-    DB_PASS = os.environ.get('DB_PASS')
-    DB_NAME = os.environ.get('DB_NAME', 'postgres')
-
+    import psycopg2
+    import psycopg2.extras
+    from google.cloud.sql.connector import Connector
+    
+    INSTANCE_CONNECTION_NAME = os.environ.get("INSTANCE_CONNECTION_NAME")
+    DB_USER = os.environ.get("DB_USER", "postgres")
+    DB_PASS = os.environ.get("DB_PASS")
+    DB_NAME = os.environ.get("DB_NAME", "postgres")
+    
+    connector = None
+    
     def get_db_connection():
-        """Get PostgreSQL connection using Cloud SQL Connector"""
-        connector = Connector()
+        """Establishes and returns a new database connection."""
+        global connector
+        if connector is None:
+            connector = Connector()
+        
         conn = connector.connect(
             INSTANCE_CONNECTION_NAME,
             "pg8000",
             user=DB_USER,
             password=DB_PASS,
-            db=DB_NAME
+            db=DB_NAME,
         )
         return conn
-
 else:
     # Local SQLite setup
-    DB_PATH = 'podcast_pro.db'
-
+    _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    DATABASE_PATH = os.path.join(_SCRIPT_DIR, "podcast_automation.db")
+    
     def get_db_connection():
-        """Get SQLite connection for local development"""
-        return sqlite3.connect(DB_PATH)
+        """Establishes and returns a new database connection."""
+        conn = sqlite3.connect(DATABASE_PATH)
+        conn.execute("PRAGMA foreign_keys = ON")
+        return conn
 
 @contextmanager
 def managed_db_connection():
@@ -54,75 +66,6 @@ def managed_db_connection():
         raise
     finally:
         conn.close()
-
-def create_tables():
-    """Create necessary database tables"""
-    if IS_CLOUD_ENV:
-        # PostgreSQL table creation
-        create_sql = """
-        CREATE TABLE IF NOT EXISTS jobs (
-            id SERIAL PRIMARY KEY,
-            job_type VARCHAR(100) NOT NULL,
-            title VARCHAR(255) NOT NULL,
-            description TEXT,
-            status VARCHAR(50) DEFAULT 'pending',
-            priority VARCHAR(20) DEFAULT 'normal',
-            file_path TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-        
-        CREATE TABLE IF NOT EXISTS job_results (
-            id SERIAL PRIMARY KEY,
-            job_id INTEGER REFERENCES jobs(id),
-            result_data JSONB,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-        """
-    else:
-        # SQLite table creation
-        create_sql = """
-        CREATE TABLE IF NOT EXISTS jobs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            job_type TEXT NOT NULL,
-            title TEXT NOT NULL,
-            description TEXT,
-            status TEXT DEFAULT 'pending',
-            priority TEXT DEFAULT 'normal',
-            file_path TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        );
-        
-        CREATE TABLE IF NOT EXISTS job_results (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            job_id INTEGER,
-            result_data TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (job_id) REFERENCES jobs (id)
-        );
-        """
-    
-    with managed_db_connection() as conn:
-        if IS_CLOUD_ENV:
-            cursor = conn.cursor()
-            cursor.execute(create_sql)
-        else:
-            conn.executescript(create_sql)
-
-def _init_postgresql_db():
-    """Initialize PostgreSQL database"""
-    logger.info("Initializing PostgreSQL database...")
-    with managed_db_connection() as conn, conn.cursor() as cursor:
-        # Create tables
-        create_tables()
-        logger.info("PostgreSQL database initialized successfully")
-
-def _init_sqlite_db():
-    """Initialize SQLite database"""
-    logger.info("Initializing SQLite database...")
-    create_tables()
-    logger.info("SQLite database initialized successfully")
 
 def init_db():
     """Initialize the database (called on app startup)"""
