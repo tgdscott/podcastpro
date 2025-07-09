@@ -68,6 +68,38 @@ def managed_db_connection():
         conn.close()
 
 def init_db():
+
+def _init_postgresql_db():
+    """Initialize PostgreSQL database schema"""
+    with managed_db_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS processing_jobs (
+                    id SERIAL PRIMARY KEY,
+                    user_email VARCHAR(255),
+                    source_file_path TEXT,
+                    status VARCHAR(50) DEFAULT 'pending',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.commit()
+
+def _init_sqlite_db():
+    """Initialize SQLite database schema"""
+    with managed_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS processing_jobs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_email TEXT,
+                source_file_path TEXT,
+                status TEXT DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
     """Initialize the database (called on app startup)"""
     try:
         logger.info("Initializing database schema...")
