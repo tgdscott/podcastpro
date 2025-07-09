@@ -67,9 +67,7 @@ def managed_db_connection():
     finally:
         conn.close()
 
-def init_db():
-
-def _init_postgresql_db():
+def init_postgresql_db():
     """Initialize PostgreSQL database schema"""
     with managed_db_connection() as conn:
         with conn.cursor() as cursor:
