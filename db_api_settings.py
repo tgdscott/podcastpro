@@ -1,15 +1,11 @@
-cat > db_api_settings.py << 'EOF'
 """
 Database operations for API keys and application settings - works with both SQLite and PostgreSQL
 """
 import logging
 from typing import Optional
-
 logger = logging.getLogger(__name__)
-
 # This will be set by db_manager.py
 managed_db_connection = None
-
 def save_api_key(service_name: str, api_key_value: str) -> bool:
     """Saves or updates an API key for a given service."""
     try:
@@ -35,7 +31,6 @@ def save_api_key(service_name: str, api_key_value: str) -> bool:
     except Exception as e:
         logger.error(f"Error saving API key for '{service_name}': {e}")
         return False
-
 def get_api_key(service_name: str) -> Optional[str]:
     """Fetches an API key for a given service."""
     try:
@@ -53,7 +48,6 @@ def get_api_key(service_name: str) -> Optional[str]:
     except Exception as e:
         logger.error(f"Error fetching API key for '{service_name}': {e}")
         return None
-
 def set_application_setting(setting_name: str, setting_value: str) -> bool:
     """Saves or updates a global application setting."""
     try:
@@ -79,7 +73,6 @@ def set_application_setting(setting_name: str, setting_value: str) -> bool:
     except Exception as e:
         logger.error(f"Error saving application setting '{setting_name}': {e}")
         return False
-
 def get_application_setting(setting_name: str, default_value: Optional[str] = None) -> Optional[str]:
     """Fetches a global application setting."""
     try:
@@ -97,4 +90,3 @@ def get_application_setting(setting_name: str, default_value: Optional[str] = No
     except Exception as e:
         logger.error(f"Error fetching application setting '{setting_name}': {e}")
         return default_value
-EOF
