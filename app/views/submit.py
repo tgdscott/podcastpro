@@ -132,7 +132,8 @@ SUBMIT_FORM = """
                 if (file) {
                     showMessage('Requesting upload URL...', 'info');
                     // Get the signed URL from our backend
-                    const signedUrlResponse = await fetch('/submit/generate-upload-url', {
+                    // --- THIS LINE IS FIXED ---
+                    const signedUrlResponse = await fetch('/generate-upload-url', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ filename: file.name, contentType: file.type })
@@ -161,7 +162,8 @@ SUBMIT_FORM = """
                 }
                 formData.delete('file'); // Remove the actual file data
 
-                const jobSubmitResponse = await fetch('/submit/', {
+                // --- THIS LINE IS FIXED ---
+                const jobSubmitResponse = await fetch('/', {
                     method: 'POST',
                     body: new URLSearchParams(formData) // Send as form-urlencoded
                 });
