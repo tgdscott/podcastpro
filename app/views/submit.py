@@ -14,66 +14,40 @@ submit_bp = Blueprint('submit', __name__)
 @submit_bp.route('/generate-upload-url', methods=['POST'])
 def generate_upload_url():
     """Generates a signed URL for uploading a file directly to GCS."""
-    logger.info("generate_upload_url route started.")
+    data = request.get_json()
+    filename = data.get('filename')
+    if not filename:
+        return jsonify({'error': 'Filename is required'}), 400
+
     try:
-        data = request.get_json()
-        if not data:
-            logger.error("Request body is not JSON or is empty.")
-            return jsonify({'error': 'Invalid request format'}), 400
-        
-        filename = data.get('filename')
-        contentType = data.get('contentType')
-        logger.info(f"Received request for filename: {filename}, contentType: {contentType}")
-
-        if not filename or not contentType:
-            logger.error("Missing filename or contentType in request.")
-            return jsonify({'error': 'Filename and contentType are required'}), 400
-
+        # Get the bucket name from environment variables
         bucket_name = os.environ.get('GCS_BUCKET_NAME')
         if not bucket_name:
-            logger.error("CRITICAL: GCS_BUCKET_NAME environment variable not set.")
+            logger.error("GCS_BUCKET_NAME environment variable not set.")
             return jsonify({'error': 'Server is not configured for file uploads.'}), 500
-        logger.info(f"Using bucket: {bucket_name}")
 
         storage_client = storage.Client()
         bucket = storage_client.bucket(bucket_name)
         
+        # Create a unique filename to avoid overwriting files
         unique_filename = f"uploads/{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}-{secure_filename(filename)}"
         blob = bucket.blob(unique_filename)
-        logger.info(f"Created blob object: {blob.name}")
 
-        # --- NEW: Check credentials type before generating signed URL ---
-        credentials = storage_client._credentials
-        # Only service_account.Credentials can sign URLs
-        from google.auth import service_account
-        if not isinstance(credentials, service_account.Credentials):
-            logger.error(
-                "Could not generate signed URL: Service account credentials with a private key are required. "
-                "Current credentials: %s. See https://googleapis.dev/python/google-api-core/latest/auth.html#setting-up-a-service-account",
-                type(credentials)
-            )
-            return jsonify({
-                'error': (
-                    'Server is not configured for file uploads. '
-                    'Contact admin: Service account credentials with a private key are required for signed URLs.'
-                )
-            }), 500
-
-        logger.info("Attempting to generate signed URL...")
+        # Generate the signed URL, valid for 15 minutes
         url = blob.generate_signed_url(
             version="v4",
             expiration=datetime.timedelta(minutes=15),
             method="PUT",
-            content_type=contentType
+            content_type=data.get('contentType')
         )
-        logger.info("Successfully generated signed URL.")
         
+        # The permanent path to the file after upload
         file_path = f"gs://{bucket_name}/{unique_filename}"
 
         return jsonify({'upload_url': url, 'file_path': file_path})
 
     except Exception as e:
-        logger.error(f"CRITICAL FAILURE in generate_upload_url: {e}", exc_info=True)
+        logger.error(f"Could not generate signed URL: {e}")
         return jsonify({'error': 'Could not generate upload URL'}), 500
 
 
