@@ -3,55 +3,12 @@ import logging
 from flask import Blueprint, request, jsonify, render_template_string
 from werkzeug.utils import secure_filename
 import db_manager
-from google.cloud import storage # <-- Make sure this import is here
-import datetime # <-- Add this import for the URL expiration
 
 logger = logging.getLogger(__name__)
 
 submit_bp = Blueprint('submit', __name__)
 
-# --- NEW: Route to generate a secure upload URL ---
-@submit_bp.route('/generate-upload-url', methods=['POST'])
-def generate_upload_url():
-    """Generates a signed URL for uploading a file directly to GCS."""
-    data = request.get_json()
-    filename = data.get('filename')
-    if not filename:
-        return jsonify({'error': 'Filename is required'}), 400
-
-    try:
-        # Get the bucket name from environment variables
-        bucket_name = os.environ.get('GCS_BUCKET_NAME')
-        if not bucket_name:
-            logger.error("GCS_BUCKET_NAME environment variable not set.")
-            return jsonify({'error': 'Server is not configured for file uploads.'}), 500
-
-        storage_client = storage.Client()
-        bucket = storage_client.bucket(bucket_name)
-        
-        # Create a unique filename to avoid overwriting files
-        unique_filename = f"uploads/{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}-{secure_filename(filename)}"
-        blob = bucket.blob(unique_filename)
-
-        # Generate the signed URL, valid for 15 minutes
-        url = blob.generate_signed_url(
-            version="v4",
-            expiration=datetime.timedelta(minutes=15),
-            method="PUT",
-            content_type=data.get('contentType')
-        )
-        
-        # The permanent path to the file after upload
-        file_path = f"gs://{bucket_name}/{unique_filename}"
-
-        return jsonify({'upload_url': url, 'file_path': file_path})
-
-    except Exception as e:
-        logger.error(f"Could not generate signed URL: {e}")
-        return jsonify({'error': 'Could not generate upload URL'}), 500
-
-
-# --- MODIFIED: The HTML form will be updated in the next step ---
+# Simple HTML form template
 SUBMIT_FORM = """
 <!DOCTYPE html>
 <html>
@@ -64,14 +21,11 @@ SUBMIT_FORM = """
         input, textarea, select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
         button { background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
         button:hover { background-color: #0056b3; }
-        #status-message { margin-top: 20px; padding: 10px; border-radius: 4px; display: none; }
-        .success { background-color: #d4edda; color: #155724; }
-        .error { background-color: #f8d7da; color: #721c24; }
     </style>
 </head>
 <body>
     <h1>Podcast Pro - Submit Job</h1>
-    <form id="job-form">
+    <form method="POST" enctype="multipart/form-data">
         <div class="form-group">
             <label for="job_type">Job Type:</label>
             <select id="job_type" name="job_type" required>
@@ -109,98 +63,16 @@ SUBMIT_FORM = """
         <button type="submit">Submit Job</button>
     </form>
     
-    <div id="status-message"></div>
     <p><a href="/admin">View Admin Dashboard</a></p>
-
-    <script>
-        const form = document.getElementById('job-form');
-        const statusMessage = document.getElementById('status-message');
-
-        form.addEventListener('submit', async (event) => {
-            event.preventDefault(); // Stop the default form submission
-            
-            const submitButton = form.querySelector('button[type="submit"]');
-            submitButton.disabled = true;
-            submitButton.textContent = 'Submitting...';
-            
-            const fileInput = document.getElementById('file');
-            const file = fileInput.files[0];
-            let filePath = null;
-
-            try {
-                // Step 1: If a file is selected, upload it to GCS first
-                if (file) {
-                    showMessage('Requesting upload URL...', 'info');
-                    // Get the signed URL from our backend
-                    const signedUrlResponse = await fetch('/submit/generate-upload-url', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ filename: file.name, contentType: file.type })
-                    });
-
-                    if (!signedUrlResponse.ok) throw new Error('Could not get upload URL.');
-                    const { upload_url, file_path } = await signedUrlResponse.json();
-                    filePath = file_path;
-
-                    // Upload the file directly to GCS
-                    showMessage(`Uploading ${file.name}...`, 'info');
-                    const uploadResponse = await fetch(upload_url, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': file.type },
-                        body: file
-                    });
-
-                    if (!uploadResponse.ok) throw new Error('File upload to storage failed.');
-                }
-
-                // Step 2: Submit the job metadata to our backend
-                showMessage('Saving job details...', 'info');
-                const formData = new FormData(form);
-                if (filePath) {
-                    formData.append('file_path', filePath); // Add the GCS file path
-                }
-                formData.delete('file'); // Remove the actual file data
-
-                const jobSubmitResponse = await fetch('/submit/', {
-                    method: 'POST',
-                    body: new URLSearchParams(formData) // Send as form-urlencoded
-                });
-
-                const result = await jobSubmitResponse.json();
-                if (!jobSubmitResponse.ok) {
-                    throw new Error(result.error || 'Failed to submit job.');
-                }
-
-                showMessage(`Job submitted successfully! Job ID: ${result.job_id}`, 'success');
-                form.reset();
-
-            } catch (error) {
-                console.error('Submission failed:', error);
-                showMessage(`Error: ${error.message}`, 'error');
-            } finally {
-                submitButton.disabled = false;
-                submitButton.textContent = 'Submit Job';
-            }
-        });
-
-        function showMessage(message, type) {
-            statusMessage.textContent = message;
-            statusMessage.className = type; // 'success' or 'error'
-            statusMessage.style.display = 'block';
-        }
-    </script>
 </body>
 </html>
 """
 
-# --- MODIFIED: The submit_job function no longer handles file uploads directly ---
 @submit_bp.route('/', methods=['GET', 'POST'])
 def submit_job():
     if request.method == 'GET':
-        # We will update this SUBMIT_FORM in the next step to include JavaScript
         return render_template_string(SUBMIT_FORM)
     
-    # This is for the POST request after the file is in GCS
     try:
         # Get form data
         job_type = request.form.get('job_type')
@@ -208,12 +80,42 @@ def submit_job():
         description = request.form.get('description', '')
         priority = request.form.get('priority', 'normal')
         
-        # IMPORTANT: The file path now comes from a hidden form field,
-        # not from a direct file upload.
-        file_path = request.form.get('file_path', None)
-        
         if not job_type or not title:
             return jsonify({'error': 'Job type and title are required'}), 400
+        
+        # Handle file upload
+        file_path = None
+        if 'file' in request.files:
+            file = request.files['file']
+            if file.filename:
+                filename = secure_filename(file.filename)
+                
+                # Save file locally or to GCS
+                if os.environ.get('INSTANCE_CONNECTION_NAME'):
+                    # Cloud environment - save to GCS
+                    try:
+                        from google.cloud import storage
+                        client = storage.Client()
+                        bucket_name = os.environ.get('GCS_BUCKET_NAME')
+                        bucket = client.bucket(bucket_name)
+                        blob = bucket.blob(f"uploads/{filename}")
+                        blob.upload_from_file(file)
+                        file_path = f"gs://{bucket_name}/uploads/{filename}"
+                        logger.info(f"File uploaded to GCS: {file_path}")
+                    except Exception as e:
+                        logger.error(f"Failed to upload to GCS: {e}")
+                        # Fall back to local storage
+                        upload_dir = 'uploads'
+                        os.makedirs(upload_dir, exist_ok=True)
+                        file_path = os.path.join(upload_dir, filename)
+                        file.save(file_path)
+                else:
+                    # Local environment - save locally
+                    upload_dir = 'uploads'
+                    os.makedirs(upload_dir, exist_ok=True)
+                    file_path = os.path.join(upload_dir, filename)
+                    file.save(file_path)
+                    logger.info(f"File saved locally: {file_path}")
         
         # Create job in database
         job_data = {
@@ -222,11 +124,11 @@ def submit_job():
             'description': description,
             'status': 'pending',
             'priority': priority,
-            'file_path': file_path # This will be the "gs://..." path or None
+            'file_path': file_path
         }
         
         job_id = db_manager.create_job(job_data)
-        logger.info(f"Job created with ID: {job_id} and file_path: {file_path}")
+        logger.info(f"Job created with ID: {job_id}")
         
         return jsonify({
             'message': 'Job submitted successfully',
@@ -238,8 +140,6 @@ def submit_job():
         logger.error(f"Error submitting job: {e}")
         return jsonify({'error': 'Failed to submit job'}), 500
 
-
-# --- UNCHANGED: This route is fine as is ---
 @submit_bp.route('/status/<job_id>')
 def job_status(job_id):
     """Get job status"""
