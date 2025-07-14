@@ -93,73 +93,85 @@ def submit_job_api():
 @submit_bp.route('/', methods=['GET'])
 def submit_form():
     """Render the job submission form"""
-    return render_template_string('''
+    from flask import make_response
+    html_content = '''
     <!DOCTYPE html>
     <html>
     <head>
-        <title>Podcast Pro - Submit Job</title>
+        <title>Podcast Pro - Submit Job (v2.0)</title>
+        <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+        <meta http-equiv="Pragma" content="no-cache">
+        <meta http-equiv="Expires" content="0">
         <style>
-            body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+            body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; background: #f5f5f5; }
+            .container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
             .form-group { margin-bottom: 20px; }
-            label { display: block; margin-bottom: 5px; font-weight: bold; }
-            input, textarea, select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
-            button { background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+            label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
+            input, textarea, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+            button { background-color: #007bff; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
             button:hover { background-color: #0056b3; }
+            button:disabled { background-color: #6c757d; cursor: not-allowed; }
             #status-message { margin-top: 20px; padding: 10px; border-radius: 4px; display: none; }
-            .success { background-color: #d4edda; color: #155724; }
-            .error { background-color: #f8d7da; color: #721c24; }
-            .info { background-color: #d1ecf1; color: #0c5460; }
+            .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+            .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+            .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+            .version { color: #666; font-size: 12px; margin-top: 20px; }
         </style>
     </head>
     <body>
-        <h1>Podcast Pro - Submit Job</h1>
-        <form id="job-form">
-            <div class="form-group">
-                <label for="job_type">Job Type:</label>
-                <select id="job_type" name="job_type" required>
-                    <option value="">Select job type</option>
-                    <option value="audio_processing">Audio Processing</option>
-                    <option value="podcast_creation">Podcast Creation</option>
-                    <option value="transcription">Transcription</option>
-                </select>
-            </div>
+        <div class="container">
+            <h1>Podcast Pro - Submit Job</h1>
+            <p class="version">Version 2.0 - Updated Routes</p>
+            <form id="job-form">
+                <div class="form-group">
+                    <label for="job_type">Job Type:</label>
+                    <select id="job_type" name="job_type" required>
+                        <option value="">Select job type</option>
+                        <option value="audio_processing">Audio Processing</option>
+                        <option value="podcast_creation">Podcast Creation</option>
+                        <option value="transcription">Transcription</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="title">Title:</label>
+                    <input type="text" id="title" name="title" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="description">Description:</label>
+                    <textarea id="description" name="description" rows="4"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="file">Upload File (optional):</label>
+                    <input type="file" id="file" name="file" accept=".mp3,.wav,.m4a,.pdf,.txt">
+                </div>
+                
+                <div class="form-group">
+                    <label for="priority">Priority:</label>
+                    <select id="priority" name="priority">
+                        <option value="normal">Normal</option>
+                        <option value="high">High</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+                
+                <button type="submit">Submit Job</button>
+            </form>
             
-            <div class="form-group">
-                <label for="title">Title:</label>
-                <input type="text" id="title" name="title" required>
-            </div>
-            
-            <div class="form-group">
-                <label for="description">Description:</label>
-                <textarea id="description" name="description" rows="4"></textarea>
-            </div>
-            
-            <div class="form-group">
-                <label for="file">Upload File (optional):</label>
-                <input type="file" id="file" name="file" accept=".mp3,.wav,.m4a,.pdf,.txt">
-            </div>
-            
-            <div class="form-group">
-                <label for="priority">Priority:</label>
-                <select id="priority" name="priority">
-                    <option value="normal">Normal</option>
-                    <option value="high">High</option>
-                    <option value="low">Low</option>
-                </select>
-            </div>
-            
-            <button type="submit">Submit Job</button>
-        </form>
-        
-        <div id="status-message"></div>
-        <p><a href="/admin">View Admin Dashboard</a></p>
+            <div id="status-message"></div>
+            <p><a href="/admin">View Admin Dashboard</a></p>
+        </div>
 
         <script>
+            console.log('Script loaded - Version 2.0');
             const form = document.getElementById('job-form');
             const statusMessage = document.getElementById('status-message');
 
             form.addEventListener('submit', async (event) => {
                 event.preventDefault();
+                console.log('Form submitted');
                 
                 const submitButton = form.querySelector('button[type="submit"]');
                 submitButton.disabled = true;
@@ -173,18 +185,25 @@ def submit_form():
                     // Step 1: If a file is selected, upload it to GCS first
                     if (file) {
                         showMessage('Requesting upload URL...', 'info');
-                        // Get the signed URL from our backend - FIXED URL
+                        console.log('Requesting upload URL for:', file.name);
+                        
+                        // UPDATED: Use the correct route without /submit prefix
                         const signedUrlResponse = await fetch('/generate-upload-url', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ filename: file.name, contentType: file.type })
                         });
 
+                        console.log('Upload URL response status:', signedUrlResponse.status);
+                        
                         if (!signedUrlResponse.ok) {
-                            const errorData = await signedUrlResponse.json();
-                            throw new Error(errorData.error || 'Could not get upload URL.');
+                            const errorText = await signedUrlResponse.text();
+                            console.error('Upload URL error:', errorText);
+                            throw new Error('Could not get upload URL. Status: ' + signedUrlResponse.status);
                         }
+                        
                         const { upload_url, file_path } = await signedUrlResponse.json();
+                        console.log('Got upload URL:', upload_url);
                         filePath = file_path;
 
                         // Upload the file directly to GCS
@@ -195,10 +214,14 @@ def submit_form():
                             body: file
                         });
 
-                        if (!uploadResponse.ok) throw new Error('File upload to storage failed.');
+                        if (!uploadResponse.ok) {
+                            console.error('Upload failed:', uploadResponse.status);
+                            throw new Error('File upload to storage failed.');
+                        }
+                        console.log('File uploaded successfully');
                     }
 
-                    // Step 2: Submit the job metadata to our backend - FIXED URL
+                    // Step 2: Submit the job metadata to our backend
                     showMessage('Saving job details...', 'info');
                     const formData = new FormData(form);
                     if (filePath) {
@@ -206,11 +229,14 @@ def submit_form():
                     }
                     formData.delete('file');
 
+                    // UPDATED: Use the correct route
                     const jobSubmitResponse = await fetch('/submit-job', {
                         method: 'POST',
                         body: new URLSearchParams(formData)
                     });
 
+                    console.log('Job submit response status:', jobSubmitResponse.status);
+                    
                     const result = await jobSubmitResponse.json();
                     if (!jobSubmitResponse.ok) {
                         throw new Error(result.error || 'Failed to submit job.');
@@ -229,6 +255,7 @@ def submit_form():
             });
 
             function showMessage(message, type) {
+                console.log('Status:', type, message);
                 statusMessage.textContent = message;
                 statusMessage.className = type;
                 statusMessage.style.display = 'block';
@@ -236,7 +263,13 @@ def submit_form():
         </script>
     </body>
     </html>
-    ''')
+    '''
+    
+    response = make_response(html_content)
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 @submit_bp.route('/legacy', methods=['GET', 'POST'])
 def submit_job_form():
