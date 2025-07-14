@@ -1,5 +1,5 @@
 import os
-from flask import (Blueprint, request, render_template, redirect, url_for, flash, session, current_app, jsonify)
+from flask import (Blueprint, request, render_template, redirect, url_for, flash, session, current_app, jsonify, render_template_string)
 from werkzeug.utils import secure_filename
 import logging
 from werkzeug.exceptions import BadRequestKeyError, BadRequest # Import specific exceptions
@@ -17,7 +17,7 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in current_app.config['ALLOWED_EXTENSIONS']
 
-@submit_bp.route('/submit/generate-upload-url', methods=['POST'])
+@submit_bp.route('/generate-upload-url', methods=['POST'])
 def generate_upload_url():
     """Generates a signed URL for uploading a file directly to GCS."""
     try:
@@ -60,7 +60,7 @@ def generate_upload_url():
         logger.error(f"Could not generate signed URL: {e}", exc_info=True)
         return jsonify({'error': 'Failed to generate upload URL'}), 500
 
-@submit_bp.route('/submit/', methods=['POST'])
+@submit_bp.route('/submit-job', methods=['POST'])
 def submit_job_api():
     """API endpoint for submitting job metadata after file upload"""
     try:
@@ -90,7 +90,155 @@ def submit_job_api():
         logger.error(f"Error submitting job: {e}", exc_info=True)
         return jsonify({'error': 'Failed to submit job'}), 500
 
-@submit_bp.route('/submit', methods=['GET', 'POST'])
+@submit_bp.route('/', methods=['GET'])
+def submit_form():
+    """Render the job submission form"""
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Podcast Pro - Submit Job</title>
+        <style>
+            body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+            .form-group { margin-bottom: 20px; }
+            label { display: block; margin-bottom: 5px; font-weight: bold; }
+            input, textarea, select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+            button { background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+            button:hover { background-color: #0056b3; }
+            #status-message { margin-top: 20px; padding: 10px; border-radius: 4px; display: none; }
+            .success { background-color: #d4edda; color: #155724; }
+            .error { background-color: #f8d7da; color: #721c24; }
+            .info { background-color: #d1ecf1; color: #0c5460; }
+        </style>
+    </head>
+    <body>
+        <h1>Podcast Pro - Submit Job</h1>
+        <form id="job-form">
+            <div class="form-group">
+                <label for="job_type">Job Type:</label>
+                <select id="job_type" name="job_type" required>
+                    <option value="">Select job type</option>
+                    <option value="audio_processing">Audio Processing</option>
+                    <option value="podcast_creation">Podcast Creation</option>
+                    <option value="transcription">Transcription</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="title">Title:</label>
+                <input type="text" id="title" name="title" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="description">Description:</label>
+                <textarea id="description" name="description" rows="4"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="file">Upload File (optional):</label>
+                <input type="file" id="file" name="file" accept=".mp3,.wav,.m4a,.pdf,.txt">
+            </div>
+            
+            <div class="form-group">
+                <label for="priority">Priority:</label>
+                <select id="priority" name="priority">
+                    <option value="normal">Normal</option>
+                    <option value="high">High</option>
+                    <option value="low">Low</option>
+                </select>
+            </div>
+            
+            <button type="submit">Submit Job</button>
+        </form>
+        
+        <div id="status-message"></div>
+        <p><a href="/admin">View Admin Dashboard</a></p>
+
+        <script>
+            const form = document.getElementById('job-form');
+            const statusMessage = document.getElementById('status-message');
+
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                
+                const submitButton = form.querySelector('button[type="submit"]');
+                submitButton.disabled = true;
+                submitButton.textContent = 'Submitting...';
+                
+                const fileInput = document.getElementById('file');
+                const file = fileInput.files[0];
+                let filePath = null;
+
+                try {
+                    // Step 1: If a file is selected, upload it to GCS first
+                    if (file) {
+                        showMessage('Requesting upload URL...', 'info');
+                        // Get the signed URL from our backend - FIXED URL
+                        const signedUrlResponse = await fetch('/generate-upload-url', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ filename: file.name, contentType: file.type })
+                        });
+
+                        if (!signedUrlResponse.ok) {
+                            const errorData = await signedUrlResponse.json();
+                            throw new Error(errorData.error || 'Could not get upload URL.');
+                        }
+                        const { upload_url, file_path } = await signedUrlResponse.json();
+                        filePath = file_path;
+
+                        // Upload the file directly to GCS
+                        showMessage(`Uploading ${file.name}...`, 'info');
+                        const uploadResponse = await fetch(upload_url, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': file.type },
+                            body: file
+                        });
+
+                        if (!uploadResponse.ok) throw new Error('File upload to storage failed.');
+                    }
+
+                    // Step 2: Submit the job metadata to our backend - FIXED URL
+                    showMessage('Saving job details...', 'info');
+                    const formData = new FormData(form);
+                    if (filePath) {
+                        formData.append('file_path', filePath);
+                    }
+                    formData.delete('file');
+
+                    const jobSubmitResponse = await fetch('/submit-job', {
+                        method: 'POST',
+                        body: new URLSearchParams(formData)
+                    });
+
+                    const result = await jobSubmitResponse.json();
+                    if (!jobSubmitResponse.ok) {
+                        throw new Error(result.error || 'Failed to submit job.');
+                    }
+
+                    showMessage(`Job submitted successfully! Job ID: ${result.job_id}`, 'success');
+                    form.reset();
+
+                } catch (error) {
+                    console.error('Submission failed:', error);
+                    showMessage(`Error: ${error.message}`, 'error');
+                } finally {
+                    submitButton.disabled = false;
+                    submitButton.textContent = 'Submit Job';
+                }
+            });
+
+            function showMessage(message, type) {
+                statusMessage.textContent = message;
+                statusMessage.className = type;
+                statusMessage.style.display = 'block';
+            }
+        </script>
+    </body>
+    </html>
+    ''')
+
+@submit_bp.route('/legacy', methods=['GET', 'POST'])
 def submit_job_form():
     if request.method == 'POST':
         # --- Handle the form submission ---
