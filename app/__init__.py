@@ -49,7 +49,7 @@ def create_app(config_class=None):
 
     # Register blueprints with error handling
     try:
-        from .views.submit import submit_bp  # FIXED: Use submit.py instead of submit2.py
+        from .views.submit2 import submit_bp  # USING submit2.py which has the working /submit-job endpoint
         from .views.admin import admin_bp
         
         app.register_blueprint(submit_bp)
