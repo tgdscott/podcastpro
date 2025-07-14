@@ -1,13 +1,21 @@
 from app import create_app
 import db_manager
 import logging
+import os
 
 app = create_app()
 
 # Initialize the database when the application starts.
-# The 'CREATE TABLE IF NOT EXISTS' statements in db_manager.py make this safe
-# to run every time the container starts.
+# Make this optional and fast-failing to prevent startup delays
 with app.app_context():
-    logging.info("Initializing database schema...")
-    db_manager.init_db()
-    logging.info("Database initialization complete.")
+    # Only try database initialization if explicitly enabled
+    if os.environ.get('INIT_DATABASE', 'false').lower() == 'true':
+        try:
+            logging.info("Database initialization requested - attempting connection...")
+            db_manager.init_db()
+            logging.info("Database initialization complete.")
+        except Exception as e:
+            logging.warning(f"Database initialization failed (continuing anyway): {e}")
+    else:
+        logging.info("Database initialization skipped (set INIT_DATABASE=true to enable)")
+        logging.info("Application starting without database - API endpoints will handle DB errors gracefully")
