@@ -121,7 +121,11 @@ def submit_form():
     <body>
         <div class="container">
             <h1>Podcast Pro - Submit Job</h1>
-            <p class="version">Version 2.0 - Updated Routes</p>
+            <p class="version">Version 2.1 - Cache Busted - Routes Fixed</p>
+            <p style="background: #fff3cd; padding: 10px; border-radius: 4px; color: #856404;">
+                <strong>Debug Info:</strong> If you see this yellow box, you have the NEW version. 
+                Routes are: /generate-upload-url (not /submit/generate-upload-url)
+            </p>
             <form id="job-form">
                 <div class="form-group">
                     <label for="job_type">Job Type:</label>
@@ -375,3 +379,18 @@ def submit_job_form():
     # For a GET request, just render the form.
     # The 'podcasts' variable might not be used in the simplified template, but it's harmless.
     return render_template('submit_job.html')
+
+@submit_bp.route('/test', methods=['GET'])
+def test_endpoint():
+    """Test endpoint to verify deployment"""
+    return jsonify({
+        'status': 'success',
+        'message': 'New deployment is active',
+        'timestamp': datetime.now().isoformat(),
+        'available_routes': [
+            'GET /',
+            'POST /generate-upload-url', 
+            'POST /submit-job',
+            'GET /test'
+        ]
+    })
