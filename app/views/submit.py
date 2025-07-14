@@ -71,6 +71,9 @@ SUBMIT_FORM = """
 </head>
 <body>
     <h1>Podcast Pro - Submit Job</h1>
+    <p style="background: #d4edda; padding: 10px; border-radius: 4px; color: #155724; margin-bottom: 20px;">
+        ✅ <strong>FIXED VERSION:</strong> Using submit.py with corrected routes (/generate-upload-url)
+    </p>
     <form id="job-form">
         <div class="form-group">
             <label for="job_type">Job Type:</label>
@@ -131,8 +134,8 @@ SUBMIT_FORM = """
                 // Step 1: If a file is selected, upload it to GCS first
                 if (file) {
                     showMessage('Requesting upload URL...', 'info');
-                    // Get the signed URL from our backend
-                    const signedUrlResponse = await fetch('/submit/generate-upload-url', {
+                    // Get the signed URL from our backend - FIXED PATH
+                    const signedUrlResponse = await fetch('/generate-upload-url', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ filename: file.name, contentType: file.type })
@@ -161,7 +164,7 @@ SUBMIT_FORM = """
                 }
                 formData.delete('file'); // Remove the actual file data
 
-                const jobSubmitResponse = await fetch('/submit/', {
+                const jobSubmitResponse = await fetch('/', {
                     method: 'POST',
                     body: new URLSearchParams(formData) // Send as form-urlencoded
                 });
