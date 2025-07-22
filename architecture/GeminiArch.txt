@@ -1,0 +1,196 @@
+Podcast Assembly System: Technical Specification
+This document outlines the core components and functionalities required to build a flexible system for assembling podcast episodes. The goal is to provide users with modular "pieces" that can be arranged, customized, and layered to create a polished podcast, while also offering a default configuration for ease of use.
+
+1. Core Audio Segments (Modules)
+The system needs to define and manage various types of audio segments, each with specific properties and functionalities. These segments should be treated as interchangeable modules that users can select and manipulate.
+
+1.1. Show Intro
+The opening segment of the podcast.
+
+Components:
+
+Opening Announcer/Host Welcome (Static): A pre-recorded audio file.
+
+Properties: audio_file_path
+
+Dynamic AI/Generated Content (Variable): Text-to-speech or other dynamically generated audio.
+
+Properties: text_input (for TTS), generation_parameters (e.g., voice, style).
+
+Behavior: Its duration will be variable based on content.
+
+Intro Music Bed: Background music for the intro.
+
+Properties: audio_file_path
+
+Controls:
+
+start_offset (seconds): Time into the overall Intro segment when music begins.
+
+end_offset (seconds): Time from the end of the overall Intro segment when music fades out.
+
+volume_automation_points (list of (time_offset, volume_level) tuples): Allows for custom volume curves (e.g., fade-in, fade-out, ducking).
+
+1.2. Main Content
+The primary audio of the podcast episode.
+
+Components (Optional Sub-segments):
+
+Individual Segments/Chapters: Users can define distinct audio blocks within the main content (e.g., interview_part_1.mp3, news_roundup.mp3).
+
+Properties: audio_file_path, segment_name (for labeling).
+
+Transitions/Stingers: Short audio cues to mark transitions between main content segments.
+
+Properties: audio_file_path, placement_marker (time offset or relative to segment end/start).
+
+1.3. Commercials/Ad Breaks
+Monetization segments.
+
+Types:
+
+Pre-roll: Placed before the Main Content.
+
+Mid-roll: Placed within the Main Content.
+
+Post-roll: Placed after the Main Content, before the Outro.
+
+Components:
+
+Ad Audio: The commercial content itself.
+
+Properties: audio_file_path, ad_provider_id (if integrated with ad platforms).
+
+Ad Music Bed (Optional): Background music for the commercial.
+
+Properties: audio_file_path
+
+Controls: Similar to Intro Music Bed, with volume_automation_points.
+
+Placement: For mid-rolls, users must be able to specify exact insertion points within the Main Content (e.g., "insert at 10:30 into main content" or "insert after segment 'Interview Part 1'").
+
+1.4. Outro
+The closing segment of the podcast.
+
+Components:
+
+Closing Announcer/Host Farewell (Static): A pre-recorded audio file.
+
+Properties: audio_file_path
+
+Call to Action: Short audio prompts.
+
+Properties: audio_file_path, text_input (for TTS options).
+
+Outro Music Bed: Music that plays during the outro.
+
+Properties: audio_file_path
+
+Controls:
+
+start_offset (seconds): Time into the overall Outro segment when music begins.
+
+fade_out_duration (seconds): Duration of the music fade-out at the end of the Outro segment.
+
+volume_automation_points (list of (time_offset, volume_level) tuples).
+
+1.5. Sound Effects/Foley
+Miscellaneous, short audio cues.
+
+Properties: audio_file_path, placement_time (absolute or relative to a segment), volume_level.
+
+Behavior: Should be layerable over any other segment.
+
+1.6. Background Music/Underscore
+Longer, atmospheric music tracks.
+
+Properties: audio_file_path, start_time, end_time (relative to overall podcast duration or specific segment), volume_level.
+
+Behavior: Primarily for subtle ambient sound; requires robust ducking capabilities (see Section 2.3).
+
+2. Core System Functionalities
+2.1. Multi-Track Layering System
+The system must support the simultaneous playback and blending of multiple audio files.
+
+Concept: Visualize as a multi-track audio editor where each "piece" can be placed on a separate track.
+
+Controls:
+
+Absolute Timing: Users define the start time of a piece relative to the beginning of the entire podcast.
+
+Relative Timing: Users define the start/end of a piece relative to another segment (e.g., "Intro Music starts 4 seconds into Intro AI").
+
+Volume Control: Independent volume adjustment for each layered piece.
+
+Fading: User-definable fade-in and fade-out curves for any audio piece.
+
+2.2. Variable Duration Handling
+The system must dynamically adjust the total podcast duration based on the combined lengths of its components, especially for variable-length elements like AI-generated content or user-uploaded main content.
+
+Implication: Time-based offsets and relative placements must be calculated on-the-fly during the assembly process.
+
+2.3. Volume Automation (Ducking)
+Critical for professional audio quality.
+
+Functionality: Automatically lower the volume of background music or sound effects when a primary audio track (e.g., voice-over, main content) is active.
+
+Controls:
+
+ducking_threshold: The volume level at which ducking is triggered.
+
+ducking_reduction: How much the background audio volume is reduced.
+
+ducking_fade_in_time: How quickly the background audio fades down.
+
+ducking_fade_out_time: How quickly the background audio fades back up.
+
+Priority System: The system needs a way to designate "primary" audio tracks that trigger ducking on "secondary" tracks.
+
+2.4. Template Management
+Allow users to save and load predefined podcast structures.
+
+Functionality:
+
+Save Template: Store the current arrangement of audio segments, their properties, and all associated controls (timing, volume, etc.) as a reusable template.
+
+Load Template: Apply a saved template to a new episode, prompting the user to provide new audio files for placeholder segments (e.g., main content, dynamic AI intro).
+
+3. Default Configuration (New User Onboarding)
+A robust default template should be provided to simplify the experience for new users or those who prefer a standard structure.
+
+3.1. Default Template Structure
+Intro:
+
+Opening Announcer (Default Audio): "Welcome to [Your Podcast Name]!"
+
+Intro Music Bed (Default Audio): A generic, royalty-free track.
+
+Volume Automation: Fades in, ducks under announcer, fades up slightly, then fades out before Main Content.
+
+Main Content:
+
+Placeholder: Indicates where the user should upload their main episode audio.
+
+Commercial Break (Optional Placeholder):
+
+Placement: Mid-roll (e.g., at the 50% mark of the Main Content or a designated user-set time).
+
+Placeholder: Indicates where the user can insert a commercial.
+
+Outro:
+
+Closing Announcer (Default Audio): "Thanks for listening to [Your Podcast Name]!"
+
+Outro Music Bed (Default Audio): A generic, royalty-free track, often the same as or complementary to the intro music.
+
+Volume Automation: Fades in after announcer, continues to play as background, then fades out to silence.
+
+3.2. User Interface Implications for Default
+Clearly indicate "placeholder" sections where users need to upload their unique content.
+
+Provide a "Use Default Template" option upon starting a new podcast project.
+
+4. Output
+The assembled podcast should be rendered into a single, high-quality audio file (e.g., MP3, WAV) with all layers, volume adjustments, and timing applied correctly.
+
+This specification provides a foundational understanding of the "pieces" and core functionalities required. The implementation will involve robust audio processing libraries, a flexible data model for representing podcast structures, and an intuitive user interface for arrangement and control.
